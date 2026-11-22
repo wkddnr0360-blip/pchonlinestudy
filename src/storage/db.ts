@@ -43,8 +43,22 @@ export interface ReviewItem {
   resolved: boolean
 }
 export interface Setting {
-  key: 'patchRead'
+  key: 'patchRead' | 'releaseSeen' | 'feedback'
   value: string
+}
+
+export interface BackupTarget {
+  key: 'primary'
+  id: string
+  destination: 'device' | 'folder'
+  folder?: FileSystemDirectoryHandle
+  lastSavedAt?: number
+  digest?: string
+  problem?: 'permission' | 'write'
+}
+export interface BackupSnapshot {
+  at: number
+  json: string
 }
 
 export class StudyDatabase extends Dexie {
@@ -53,6 +67,8 @@ export class StudyDatabase extends Dexie {
   exams!: EntityTable<ExamSession, 'id'>
   reviews!: EntityTable<ReviewItem, 'id'>
   settings!: EntityTable<Setting, 'key'>
+  backupTargets!: EntityTable<BackupTarget, 'key'>
+  snapshots!: EntityTable<BackupSnapshot, 'at'>
 
   constructor(name = 'police-constitution-ox') {
     super(name)
@@ -63,6 +79,7 @@ export class StudyDatabase extends Dexie {
       reviews: 'id,stage,chapterKey,at',
       settings: 'key',
     })
+    this.version(2).stores({ backupTargets: 'key', snapshots: 'at' })
   }
 }
 

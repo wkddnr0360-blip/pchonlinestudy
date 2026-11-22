@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('chapter study, source, pixel feedback, and offline review', async ({ page, context, isMobile }) => {
   await page.goto('./')
-  await expect(page.getByRole('heading', { name: '헌법, 한 문제씩.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '박철한의 무한회독' })).toBeVisible()
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready
     if (!navigator.serviceWorker.controller) {
@@ -10,7 +10,7 @@ test('chapter study, source, pixel feedback, and offline review', async ({ page,
     }
   })
   await page.getByRole('button', { name: '패치노트' }).click()
-  await expect(page.getByRole('dialog')).toContainText('첫 버전')
+  await expect(page.getByRole('dialog')).toContainText('Canary 1.1.0')
   await page.getByRole('button', { name: '닫기' }).click()
   await page.getByRole('link', { name: '학습 시작' }).click()
   await page.getByRole('button', { name: /제1장 헌법의 개념과 헌법학/ }).click()

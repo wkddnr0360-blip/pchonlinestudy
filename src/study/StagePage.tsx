@@ -7,7 +7,7 @@ import { getQuestions } from '../book/catalog'
 import type { BookIndex, Scope } from '../book/types'
 import { db } from '../storage/db'
 import { ErrorNotice, Modal } from '../ui/Controls'
-import { Teacher } from '../ui/Teacher'
+import { TeacherButton } from '../ui/TeacherButton'
 import { scopeKey, shuffle } from './selection'
 
 interface Selection {
@@ -90,7 +90,7 @@ export default function StagePage({ book }: { book: BookIndex }) {
           <Play size={17} /> 전체 풀기
         </button>
       </div>
-      <Teacher stage={model.number} className="banner-teacher welcome-motion" />
+      <TeacherButton stage={model.number} className="banner-teacher welcome-motion" />
     </section>
     <section className="topic-section" aria-labelledby="topic-title">
       <div className="section-heading"><h2 id="topic-title">교재 목차</h2></div>

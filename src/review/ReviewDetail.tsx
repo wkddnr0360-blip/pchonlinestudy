@@ -3,7 +3,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { getChapter } from '../book/catalog'
 import type { BookIndex, Ox, Question } from '../book/types'
 import { ExamReview, examPrompt, optionLabels } from '../exam/ExamReview'
-import { type ExamQuestion } from '../exam/generate'
+import { correctOption, type ExamQuestion } from '../exam/generate'
+import { playReward } from '../feedback/audio'
+import { useFeedbackPreferences } from '../feedback/preferences'
 import { db, type ReviewItem } from '../storage/db'
 import { ErrorNotice, Loading } from '../ui/Controls'
 import { OxButtons } from '../ui/OxButtons'
@@ -11,11 +13,15 @@ import { Explanation, QuestionSource } from '../ui/QuestionContent'
 
 function ExamRetry({ examQuestion }: { examQuestion: ExamQuestion }) {
   const [selected, setSelected] = useState<number>()
+  const { fun, reward } = useFeedbackPreferences()
   return selected === undefined ? <>
     <h3>{examPrompt(examQuestion)}</h3>
     <div className="exam-options" role="group" aria-label="다시 풀기 보기">
       {examQuestion.options.map((option, index) => <button className="exam-option" type="button"
-        key={option.id} onClick={() => setSelected(index)}>
+        key={option.id} onClick={() => {
+          setSelected(index)
+          if (fun && correctOption(examQuestion) === index) playReward(reward)
+        }}>
         <strong>{optionLabels[index]}</strong><span className="original">{option.prompt}</span>
       </button>)}
     </div>
@@ -32,6 +38,7 @@ function ExamDetail({ item }: { item: ReviewItem }) {
 function OxDetail({ book, item }: { book: BookIndex; item: ReviewItem }) {
   const [question, setQuestion] = useState<Question>()
   const [selected, setSelected] = useState<Ox>()
+  const { fun, reward } = useFeedbackPreferences()
   const [error, setError] = useState(false)
   useEffect(() => {
     let active = true
@@ -48,7 +55,10 @@ function OxDetail({ book, item }: { book: BookIndex; item: ReviewItem }) {
   return <>
     <h3 className="original review-prompt">{question.prompt}</h3>
     <QuestionSource question={question} />
-    <OxButtons selected={selected} onAnswer={setSelected} />
+    <OxButtons selected={selected} onAnswer={(answer) => {
+      setSelected(answer)
+      if (fun && answer === question.answer) playReward(reward)
+    }} />
     {selected && <Explanation question={question} />}
   </>
 }

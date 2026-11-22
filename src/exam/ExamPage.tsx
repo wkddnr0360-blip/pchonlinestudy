@@ -31,7 +31,7 @@ function ExamRunner({ exam }: { exam: ExamSession }) {
     void submitExam(exam.id).catch(() => setError('시험 결과를 저장하지 못했습니다. 다시 제출해 주세요.'))
   }
 
-  return <div className="exam-layout">
+  return <div className="exam-layout" data-quiet>
     <div className="exam-top">
       <Link className="back-link" to="/exam"><ArrowLeft size={17} /> 모의고사</Link>
       <ExamClock deadline={exam.deadline} onExpire={setExpired} />

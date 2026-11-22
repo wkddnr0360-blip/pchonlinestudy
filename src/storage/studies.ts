@@ -17,6 +17,7 @@ export function answerStudy(session: StudySession, question: Question, answer: O
       })
     }
     await db.studies.update(session.key, { updatedAt: at })
+    return correct
   })
 }
 
