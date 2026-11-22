@@ -20,7 +20,7 @@ export function Home({ book }: { book: BookIndex }) {
         <div className="hero-rings" aria-hidden="true"><i /><i /><i /></div>
         <div className="hero-content">
           <span className="hero-badge"><Infinity size={16} /> 박철한 경찰헌법</span>
-          <h1 id="hero-title">박철한의 무한회독</h1>
+          <h1 id="hero-title">헌법의 핵심은 무한회독</h1>
           <p>풀고, 틀리고, 다시 풀며 헌법을 내 것으로.</p>
           <Link className="button hero-button" to={latest ? '/study/' + latest.key : '/stage/1'}>
             {latest ? '이어 풀기' : '학습 시작'} <ArrowRight size={17} />

@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test('Canary branding, one-time notice and every teacher reaction', async ({ page }) => {
   await page.goto('./')
   await expect(page).toHaveTitle('박철한 온스')
-  await expect(page.getByRole('heading', { name: '박철한의 무한회독' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '헌법의 핵심은 무한회독' })).toBeVisible()
   const notice = page.getByRole('complementary', { name: '버전 안내' })
   await expect(notice).toContainText('Canary 1.1.0')
   await notice.getByRole('button', { name: '확인' }).click()
