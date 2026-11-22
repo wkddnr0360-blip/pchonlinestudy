@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('chapter study, source, pixel feedback, and offline review', async ({ page, context, isMobile }) => {
   await page.goto('./')
-  await expect(page.getByRole('heading', { name: '박철한의 무한회독' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '헌법의 핵심은 무한회독' })).toBeVisible()
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready
     if (!navigator.serviceWorker.controller) {
