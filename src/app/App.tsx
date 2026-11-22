@@ -11,6 +11,7 @@ import { ErrorNotice, Loading } from '../ui/Controls'
 import { Home } from './Home'
 import { markNotesRead, PatchNotes } from './PatchNotes'
 import { APP_NAME, APP_VERSION, RELEASE_CHANNEL } from './release'
+import { AppUpdateNotice } from './updates/AppUpdateNotice'
 
 const StagePage = lazy(() => import('../study/StagePage'))
 const StudyPage = lazy(() => import('../study/StudyPage'))
@@ -69,6 +70,7 @@ export function App() {
       </div>
     </header>
     <main id="main-content" tabIndex={-1} className="page">
+      <AppUpdateNotice />
       {error ? <ErrorNotice message={error} retry={loadBook} /> : !book ? <Loading /> :
         <Suspense fallback={<Loading />}>
           <Routes>
