@@ -10,3 +10,5 @@
 - 원본 HWPX에서 재생성한 27개 장 파일과 목차가 앱 데이터와 바이트 단위로 일치했다. 3,129개 문제·해설의 세로 배치도 대조했다.
 - 단위 테스트 4개와 Chromium 데스크톱·모바일 브라우저 테스트 6개를 통과했다. 모바일 메뉴, 오프라인 이어 풀기, 시험 만료와 백업 복원을 포함한다.
 - 공개 배포 저장소는 `wkddnr0360-blip/pchonlinestudy`다.
+- [GitHub Pages](https://wkddnr0360-blip.github.io/pchonlinestudy/)에 첫 버전을 배포했다. 공개 환경에서 홈, 1단계 목차, 교재 1번과 기출 출처 표시를 확인했다. [GitHub Actions 배포 실행 기록](https://github.com/wkddnr0360-blip/pchonlinestudy/actions/runs/45036607800)
+- iPhone 크기의 WebKit에서 교재 풀이, 새로고침 후 기록 유지와 서비스 워커 등록을 확인했다. 실물 iPhone에서 홈 화면에 추가하는 단계는 직접 확인하지 못했다.
