@@ -1,0 +1,66 @@
+import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { ArrowRight, Check, ChevronDown, ClipboardList, RotateCcw } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import type { BookIndex } from '../book/types'
+import { db } from '../storage/db'
+import { ErrorNotice, Loading, ParagraphHeading } from '../ui/Controls'
+import { ReviewDetail } from './ReviewDetail'
+
+export default function ReviewPage({ book }: { book: BookIndex }) {
+  const items = useLiveQuery(() => db.reviews.orderBy('at').reverse().toArray())
+  const [stage, setStage] = useState('')
+  const [chapter, setChapter] = useState('')
+  const [completed, setCompleted] = useState(false)
+  const [expanded, setExpanded] = useState<string>()
+  const [error, setError] = useState('')
+  const chapters = book.stages.filter((entry) => !stage || String(entry.stage) === stage)
+    .flatMap((entry) => entry.parts.flatMap((part) => part.chapters))
+  const filtered = items?.filter((item) => item.resolved === completed
+    && (!stage || String(item.stage) === stage) && (!chapter || item.chapterKey === chapter))
+  const labelByKey = new Map(chapters.map((entry) => [entry.key, entry.label]))
+
+  function resolve(id: string) {
+    void db.reviews.update(id, { resolved: !completed }).catch(() => setError('복습 상태를 저장하지 못했습니다.'))
+  }
+
+  return <>
+    <ParagraphHeading title="오답노트" description="틀린 문제와 미응답 문제를 모아서 다시 풀어요." />
+    <div className="review-filter">
+      <div className="segmented" role="group" aria-label="복습 상태">
+        <button aria-pressed={!completed} onClick={() => { setCompleted(false); setExpanded(undefined) }}>복습할 문제</button>
+        <button aria-pressed={completed} onClick={() => { setCompleted(true); setExpanded(undefined) }}>복습 완료</button>
+      </div>
+      <label><span className="visually-hidden">단계</span><select value={stage} onChange={(event) => {
+        setStage(event.target.value)
+        setChapter('')
+      }}><option value="">모든 단계</option>{[1, 2, 3].map((value) => <option key={value} value={value}>{value}단계</option>)}</select></label>
+      <label><span className="visually-hidden">목차</span><select value={chapter} onChange={(event) => setChapter(event.target.value)}>
+        <option value="">모든 목차</option>
+        {chapters.map((entry) => <option key={entry.key} value={entry.key}>{stage ? '' : entry.key[0] + '단계 · '}{entry.label}</option>)}
+      </select></label>
+    </div>
+    {error && <ErrorNotice message={error} />}
+    {!filtered ? <Loading /> : filtered.length === 0
+      ? <section className="center-card empty-state"><span className="small-icon warm-icon"><ClipboardList size={26} /></span>
+        <h2>{completed ? '완료한 복습이 없어요.' : '복습할 문제가 없어요.'}</h2>
+        <Link className="button secondary" to="/">학습 홈 <ArrowRight size={16} /></Link>
+      </section>
+      : <section aria-label="오답 목록" className="review-list">
+        {filtered.map((item) => <article className="result-entry" key={item.id}>
+          <button className="topic-row" aria-expanded={expanded === item.id}
+            onClick={() => setExpanded(expanded === item.id ? undefined : item.id)}>
+            <div><strong>{item.type === 'ox' ? '교재 ' + item.no.toLocaleString('ko-KR') + '번' : '모의고사 ' + ((item.examPosition ?? 0) + 1) + '번'}</strong>
+              <span>{item.stage}단계 · {labelByKey.get(item.chapterKey)}</span></div>
+            <ChevronDown size={18} />
+          </button>
+          {expanded === item.id && <div className="review-body">
+            <ReviewDetail key={item.id} book={book} item={item} />
+            <button className="button secondary" onClick={() => resolve(item.id)}>
+              {completed ? <RotateCcw size={17} /> : <Check size={17} />}{completed ? '다시 복습할 문제로' : '복습 완료 표시'}
+            </button>
+          </div>}
+        </article>)}
+      </section>}
+  </>
+}
