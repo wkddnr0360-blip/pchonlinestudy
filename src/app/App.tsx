@@ -1,13 +1,16 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Bell, BookOpen, ClipboardList, Clock3, Settings, Scale } from 'lucide-react'
+import { Bell, BookOpen, ClipboardList, Clock3, Settings } from 'lucide-react'
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { getBookIndex } from '../book/catalog'
 import type { BookIndex } from '../book/types'
+import { FeedbackEffects } from '../feedback/FeedbackEffects'
+import { AutoBackupRunner } from '../storage/AutoBackupRunner'
 import { db } from '../storage/db'
 import { ErrorNotice, Loading } from '../ui/Controls'
 import { Home } from './Home'
-import { markNotesRead, PatchNotes, patchVersion } from './PatchNotes'
+import { markNotesRead, PatchNotes } from './PatchNotes'
+import { APP_NAME, APP_VERSION, RELEASE_CHANNEL } from './release'
 
 const StagePage = lazy(() => import('../study/StagePage'))
 const StudyPage = lazy(() => import('../study/StudyPage'))
@@ -41,15 +44,17 @@ export function App() {
   ))
 
   return <>
+    <FeedbackEffects />
+    <AutoBackupRunner />
     <a className="skip-link" href="#main-content" onClick={(event) => {
       event.preventDefault()
       document.getElementById('main-content')?.focus()
     }}>본문으로 건너뛰기</a>
     <header className="site-header">
       <div className="header-inner">
-        <Link className="brand" to="/" aria-label="박철한 경찰헌법 OX 홈">
-          <span className="brand-icon"><Scale size={23} strokeWidth={2.1} /></span>
-          <span><strong>박철한 경찰헌법</strong><small>OX 학습실</small></span>
+        <Link className="brand" to="/" aria-label={APP_NAME + " 홈"}>
+          <img className="brand-icon" src={import.meta.env.BASE_URL + "icons/ons-192.png"} width={43} height={43} alt="" />
+          <span><strong>{APP_NAME}</strong><small>{RELEASE_CHANNEL}</small></span>
         </Link>
         <nav className="main-nav" aria-label="주 메뉴">{tabs}</nav>
         <div className="header-actions">
@@ -58,7 +63,7 @@ export function App() {
             setNotes(true)
             void markNotesRead().catch(() => undefined)
           }}>
-            <Bell size={21} />{read?.value !== patchVersion && <i aria-hidden="true" />}
+            <Bell size={21} />{read?.value !== APP_VERSION && <i aria-hidden="true" />}
           </button>
         </div>
       </div>

@@ -1,9 +1,9 @@
 import type { Stage } from '../book/types'
 
 export const stages = [
-  { number: 1, name: '기본 다지기', label: '핵심 개념과 중요 지문', color: 'mint' },
-  { number: 2, name: '실전 감각', label: '기출 지문으로 한 단계 더', color: 'blue' },
-  { number: 3, name: '고득점 도전', label: '난도 높은 지문까지 마무리', color: 'lavender' },
+  { number: 1, name: '기본 다지기', label: '이 정도는 가볍게 풀리네요!', color: 'mint' },
+  { number: 2, name: '실전 감각', label: '오, 이제 실전 감이 오네요!', color: 'blue' },
+  { number: 3, name: '고득점 도전', label: '잠깐, 이 어려운 것도 풀리는데요?!', color: 'lavender' },
 ] as const
 
 export function validStage(value: string | undefined): value is '1' | '2' | '3' {

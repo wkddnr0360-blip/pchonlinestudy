@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, BookOpen, Check, ListChecks } from 'lucide-react
 import { Link, useParams } from 'react-router-dom'
 import { getQuestions } from '../book/catalog'
 import type { BookIndex, Ox, Question } from '../book/types'
+import { playReward } from '../feedback/audio'
+import { useFeedbackPreferences } from '../feedback/preferences'
 import { db, type StudySession } from '../storage/db'
 import { answerStudy, moveStudy } from '../storage/studies'
 import { ErrorNotice, Loading } from '../ui/Controls'
@@ -15,10 +17,14 @@ function QuestionView({ session, question, count }: { session: StudySession; que
   const attempt = useLiveQuery(() => db.attempts.get(session.id + ':' + question.no), [session.id, question.no])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const { fun, reward } = useFeedbackPreferences()
 
   async function pick(answer: Ox) {
     setBusy(true)
-    try { await answerStudy(session, question, answer) }
+    try {
+      const correct = await answerStudy(session, question, answer)
+      if (correct && fun) playReward(reward)
+    }
     catch { setError('답안을 저장하지 못했습니다. 다시 선택해 주세요.') }
     finally { setBusy(false) }
   }

@@ -1,9 +1,10 @@
-import { ArrowRight, BookOpen, ChevronRight, ClipboardList, Clock3, Repeat2, Zap } from 'lucide-react'
+import { ArrowRight, BookOpen, ChevronRight, ClipboardList, Clock3, Repeat2, Infinity } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import type { BookIndex } from '../book/types'
 import { db } from '../storage/db'
-import { Teacher } from '../ui/Teacher'
+import { TeacherButton } from '../ui/TeacherButton'
+import { ReleaseBanner } from './ReleaseBanner'
 import { stages } from './stages'
 
 export function Home({ book }: { book: BookIndex }) {
@@ -13,18 +14,19 @@ export function Home({ book }: { book: BookIndex }) {
   const count = answered.length
   const progress = Math.round(count / book.count * 100)
   return <>
+    <ReleaseBanner />
     <div className="hero-grid">
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-rings" aria-hidden="true"><i /><i /><i /></div>
         <div className="hero-content">
-          <span className="hero-badge"><Zap size={14} fill="currentColor" /> 경찰헌법 OX</span>
-          <h1 id="hero-title">헌법, 한 문제씩.</h1>
-          <p>기본부터 고득점까지, 나의 속도로.</p>
+          <span className="hero-badge"><Infinity size={16} /> 박철한 경찰헌법</span>
+          <h1 id="hero-title">박철한의 무한회독</h1>
+          <p>풀고, 틀리고, 다시 풀며 헌법을 내 것으로.</p>
           <Link className="button hero-button" to={latest ? '/study/' + latest.key : '/stage/1'}>
             {latest ? '이어 풀기' : '학습 시작'} <ArrowRight size={17} />
           </Link>
         </div>
-        <Teacher stage={3} className="hero-teacher" />
+        <TeacherButton stage={3} className="hero-teacher" />
       </section>
       <section className="dashboard-progress" aria-labelledby="progress-title">
         <div className="panel-title">
@@ -43,13 +45,15 @@ export function Home({ book }: { book: BookIndex }) {
       <div className="stage-grid">
         {stages.map((stage) => {
           const total = book.stages[stage.number - 1].parts.reduce((sum, part) => sum + part.count, 0)
-          return <Link className={'stage-card ' + stage.color} key={stage.number} to={'/stage/' + stage.number}>
-            <span className="tag">{stage.number}단계</span>
-            <h3>{stage.name}</h3>
-            <p>{stage.label}</p>
-            <span className="stage-count">{total.toLocaleString('ko-KR')}문항 <ChevronRight size={16} /></span>
-            <div className="teacher-orb"><Teacher stage={stage.number} /></div>
-          </Link>
+          return <article className={'stage-card ' + stage.color} key={stage.number}>
+            <Link className="stage-link" to={'/stage/' + stage.number}>
+              <span className="tag">{stage.number}단계</span>
+              <h3>{stage.name}</h3>
+              <p>{stage.label}</p>
+              <span className="stage-count">{total.toLocaleString('ko-KR')}문항 <ChevronRight size={16} /></span>
+            </Link>
+            <div className="teacher-orb"><TeacherButton stage={stage.number} /></div>
+          </article>
         })}
       </div>
     </section>

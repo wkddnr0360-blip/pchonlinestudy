@@ -3,7 +3,7 @@
 .stage-banner h1 { font-size: clamp(27px, 4vw, 43px); letter-spacing: -.06em; margin-top: 8px; }
 .stage-banner p { color: var(--muted); margin: 6px 0 15px; font-size: 15px; }
 .stage-banner::after { content: ''; width: min(34%, 300px); aspect-ratio: 1; border-radius: 50%; position: absolute; right: 5%; background: var(--orb); z-index: -1; }
-.banner-teacher { --sprite: clamp(135px, 19vw, 204px); position: absolute; right: 7%; bottom: 1px; }
+.banner-teacher { --sprite: clamp(135px, 19vw, 204px); position: absolute; right: 12%; bottom: 1px; }
 .topic-section { margin-top: 27px; }
 .toc-part { background: #fff; border: 1px solid var(--border); border-radius: 18px; margin-bottom: 10px; overflow: hidden; }
 .toc-part summary { display: flex; align-items: center; gap: 10px; padding: 16px 18px; min-height: 55px; cursor: pointer; list-style: none; }
@@ -120,7 +120,7 @@ form > .error-card { margin-bottom: 12px; }
   .stage-banner { min-height: 166px; padding: 16px; }
   .stage-banner p { max-width: 220px; font-size: 13px; }
   .stage-banner::after { width: 29%; right: 4%; }
-  .banner-teacher { right: 2%; }
+  .banner-teacher { right: 7%; }
   .topic-section { margin-top: 19px; }
   .study-columns, .exam-body { grid-template-columns: 1fr; gap: 8px; }
   .question-panel, .study-answer, .exam-question { padding: 15px; }

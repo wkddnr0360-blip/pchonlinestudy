@@ -44,7 +44,7 @@ const backupSchema = z.object({
     id: z.string(), type: z.enum(['ox', 'exam']), no: bookNo, chapterKey, stage,
     examId: z.uuid().optional(), examPosition: examPosition.optional(), at: timestamp, resolved: z.boolean(),
   })),
-  settings: z.array(z.object({ key: z.literal('patchRead'), value: z.string() })),
+  settings: z.array(z.object({ key: z.enum(['patchRead', 'releaseSeen', 'feedback']), value: z.string() })),
 })
 
 const tables = [db.studies, db.attempts, db.exams, db.reviews, db.settings]

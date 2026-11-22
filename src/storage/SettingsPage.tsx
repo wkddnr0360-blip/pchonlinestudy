@@ -1,6 +1,8 @@
 import { useState, type ChangeEvent } from 'react'
 import { Download, Smartphone, Upload } from 'lucide-react'
+import { FeedbackSettings } from '../feedback/FeedbackSettings'
 import { ErrorNotice, Modal, ParagraphHeading } from '../ui/Controls'
+import { AutoBackupSettings } from './AutoBackupSettings'
 import { exportBackup, readBackup, restoreBackup, type Backup } from './backup'
 
 export default function SettingsPage() {
@@ -16,7 +18,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }))
       const element = document.createElement('a')
       element.href = url
-      element.download = '헌법OX-학습기록-' + new Date().toISOString().slice(0, 10) + '.json'
+      element.download = '박철한-온스-학습기록-' + new Date().toISOString().slice(0, 10) + '.json'
       document.body.append(element)
       element.click()
       element.remove()
@@ -49,6 +51,8 @@ export default function SettingsPage() {
 
   return <div className="narrow-page">
     <ParagraphHeading title="학습 기록 설정" description="학습 기록은 이 브라우저에 저장돼요." />
+    <FeedbackSettings />
+    <AutoBackupSettings onRestore={(data) => { setError(""); setStatus(""); setBackup(data) }} />
     <section className="surface settings-card">
       <h2>학습 기록 백업</h2>
       <div className="button-row">

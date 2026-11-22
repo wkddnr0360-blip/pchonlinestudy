@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: {
         id: base,
-        name: '박철한 경찰헌법 OX',
-        short_name: '헌법 OX',
+        name: '박철한 온스',
+        short_name: '박철한 온스',
         lang: 'ko',
         display: 'standalone',
         background_color: '#f8f9fc',
@@ -21,8 +21,9 @@ export default defineConfig({
         start_url: base,
         scope: base,
         icons: [
-          { src: 'icons/app-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icons/app-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: 'icons/ons-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icons/ons-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icons/ons-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
