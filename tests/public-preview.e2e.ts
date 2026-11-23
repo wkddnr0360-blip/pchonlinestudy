@@ -21,6 +21,7 @@ test('study, mock exams, and device backup work before HTTPS is available', asyn
   await page.getByRole('button', { name: 'X 틀리다' }).click()
   await expect(page.getByText('오답노트에 담았어요.')).toBeVisible()
   await page.getByRole('button', { name: '다음' }).click()
+  await expect(page.getByText('교재 2번')).toBeVisible()
   await page.reload()
   await expect(page.getByText('교재 2번')).toBeVisible()
 
@@ -29,6 +30,7 @@ test('study, mock exams, and device backup work before HTTPS is available', asyn
   const options = page.getByRole('group', { name: '보기' }).getByRole('button')
   await expect(options).toHaveCount(4)
   await options.first().click()
+  await expect(options.first()).toHaveAttribute('aria-pressed', 'true')
   await page.reload()
   await expect(options.first()).toHaveAttribute('aria-pressed', 'true')
 
