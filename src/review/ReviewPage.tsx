@@ -6,6 +6,7 @@ import type { BookIndex } from '../book/types'
 import { db } from '../storage/db'
 import { ErrorNotice, Loading, ParagraphHeading } from '../ui/Controls'
 import { ReviewDetail } from './ReviewDetail'
+import { PremiumGate } from '../premium/PremiumGate'
 import { groupReviews, reviewChapters } from './reviewOrder'
 
 export default function ReviewPage({ book }: { book: BookIndex }) {
@@ -60,7 +61,9 @@ export default function ReviewPage({ book }: { book: BookIndex }) {
               <ChevronDown size={18} />
             </button>
             {expanded === item.id && <div className="review-body">
-              <ReviewDetail key={item.id} book={book} item={item} />
+              {item.stage > 1 || item.type === 'exam'
+                ? <PremiumGate title="유료 문제 복습"><ReviewDetail key={item.id} book={book} item={item} /></PremiumGate>
+                : <ReviewDetail key={item.id} book={book} item={item} />}
               <button className="button secondary" onClick={() => resolve(item.id)}>
                 {completed ? <RotateCcw size={17} /> : <Check size={17} />}{completed ? '다시 복습할 문제로' : '복습 완료 표시'}
               </button>

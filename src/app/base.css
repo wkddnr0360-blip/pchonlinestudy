@@ -1,6 +1,7 @@
 @import './home.css';
 @import './learning.css';
 @import './canary.css';
+@import '../premium/premium.css';
 
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans CJK KR", "Segoe UI", sans-serif;

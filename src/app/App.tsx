@@ -1,13 +1,14 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Bell, BookOpen, ClipboardList, Clock3, Settings } from 'lucide-react'
-import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Bell, BookOpen, ClipboardList, Clock3, Settings, LockKeyhole } from 'lucide-react'
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { getBookIndex } from '../book/catalog'
 import type { BookIndex } from '../book/types'
 import { FeedbackEffects } from '../feedback/FeedbackEffects'
 import { AutoBackupRunner } from '../storage/AutoBackupRunner'
 import { db } from '../storage/db'
 import { ErrorNotice, Loading } from '../ui/Controls'
+import { PremiumGate } from '../premium/PremiumGate'
 import { Home } from './Home'
 import { markNotesRead, PatchNotes } from './PatchNotes'
 import { APP_NAME, APP_VERSION, RELEASE_CHANNEL } from './release'
@@ -19,12 +20,24 @@ const ExamLobby = lazy(() => import('../exam/ExamLobby'))
 const ExamPage = lazy(() => import('../exam/ExamPage'))
 const ReviewPage = lazy(() => import('../review/ReviewPage'))
 const SettingsPage = lazy(() => import('../storage/SettingsPage'))
+const PremiumAccount = lazy(() => import('../premium/PremiumAccount'))
 
 const navigation = [
   { to: '/', title: '학습 홈', icon: BookOpen },
   { to: '/exam', title: '모의고사', icon: Clock3 },
   { to: '/review', title: '오답노트', icon: ClipboardList },
 ]
+
+function ProtectedStage({ book }: { book: BookIndex }) {
+  const { stage } = useParams()
+  return stage === '1' ? <StagePage book={book} /> :
+    <PremiumGate title={stage + '단계 학습'}><StagePage book={book} /></PremiumGate>
+}
+function ProtectedStudy({ book }: { book: BookIndex }) {
+  const key = useParams()['*'] ?? ''
+  return key.startsWith('1/') ? <StudyPage book={book} /> :
+    <PremiumGate title="2·3단계 학습"><StudyPage book={book} /></PremiumGate>
+}
 
 export function App() {
   const [book, setBook] = useState<BookIndex>()
@@ -59,6 +72,7 @@ export function App() {
         </Link>
         <nav className="main-nav" aria-label="주 메뉴">{tabs}</nav>
         <div className="header-actions">
+          <Link className="icon-button" to="/membership" aria-label="회원 및 유료 이용권 관리"><LockKeyhole size={21} /></Link>
           <Link className="icon-button" to="/settings" aria-label="학습 기록 설정"><Settings size={21} /></Link>
           <button className="icon-button notification-button" aria-label="패치노트" onClick={() => {
             setNotes(true)
@@ -75,12 +89,13 @@ export function App() {
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route path="/" element={<Home book={book} />} />
-            <Route path="/stage/:stage" element={<StagePage book={book} />} />
-            <Route path="/study/*" element={<StudyPage book={book} />} />
-            <Route path="/exam" element={<ExamLobby book={book} />} />
-            <Route path="/exam/:id" element={<ExamPage />} />
+            <Route path="/stage/:stage" element={<ProtectedStage book={book} />} />
+            <Route path="/study/*" element={<ProtectedStudy book={book} />} />
+            <Route path="/exam" element={<PremiumGate title="실전 모의고사"><ExamLobby book={book} /></PremiumGate>} />
+            <Route path="/exam/:id" element={<PremiumGate title="실전 모의고사"><ExamPage /></PremiumGate>} />
             <Route path="/review" element={<ReviewPage book={book} />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/membership" element={<PremiumAccount />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>}

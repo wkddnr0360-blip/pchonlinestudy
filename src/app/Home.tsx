@@ -1,13 +1,16 @@
-import { ArrowRight, BookOpen, ChevronRight, ClipboardList, Clock3, Repeat2, Infinity } from 'lucide-react'
+import { ArrowRight, BookOpen, ChevronRight, ClipboardList, Clock3, Repeat2, Infinity, LockKeyhole } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import type { BookIndex } from '../book/types'
 import { db } from '../storage/db'
+import { premiumEnabled } from '../premium/client'
+import { usePremium } from '../premium/PremiumProvider'
 import { TeacherButton } from '../ui/TeacherButton'
 import { ReleaseBanner } from './ReleaseBanner'
 import { stages } from './stages'
 
 export function Home({ book }: { book: BookIndex }) {
+  const { member } = usePremium()
   const answered = useLiveQuery(() => db.attempts.orderBy('no').uniqueKeys(), [], [])
   const pending = useLiveQuery(() => db.reviews.filter((item) => !item.resolved).count(), [], 0)
   const latest = useLiveQuery(() => db.studies.orderBy('updatedAt').last())
@@ -48,6 +51,7 @@ export function Home({ book }: { book: BookIndex }) {
           return <article className={'stage-card ' + stage.color} key={stage.number}>
             <Link className="stage-link" to={'/stage/' + stage.number}>
               <span className="tag">{stage.number}단계</span>
+              {premiumEnabled && stage.number > 1 && !member?.premium && <span className="tag"><LockKeyhole size={12} /> 유료 이용권</span>}
               <h3>{stage.name}</h3>
               <p>{stage.label}</p>
               <span className="stage-count">{total.toLocaleString('ko-KR')}문항 <ChevronRight size={16} /></span>
