@@ -17,11 +17,22 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
     env:
       PAGES_BASE: /${{ github.event.repository.name }}/
       PAGES_PREVIEW: "1"
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
+        id: pages
+      - name: Set the build path from GitHub Pages
+        if: github.event_name != 'pull_request'
+        env:
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: printf 'PAGES_BASE=%s/\n' "$PAGES_BASE_PATH" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -55,6 +66,5 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4
