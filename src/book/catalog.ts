@@ -1,4 +1,5 @@
 import type { BookIndex, Question, Scope } from './types'
+import { getPremiumChapter, premiumEnabled } from '../premium/client'
 
 let index: Promise<BookIndex> | undefined
 const chunks = new Map<string, Promise<Question[]>>()
@@ -20,7 +21,9 @@ export function getBookIndex() {
 
 export function getChapter(index: BookIndex, key: string) {
   if (!chunks.has(key)) {
-    const request = readJson<Question[]>(index.version + '/' + key + '.json').catch((error: unknown) => {
+    const request = (premiumEnabled && /^[23]-/.test(key)
+      ? getPremiumChapter(index.version, key)
+      : readJson<Question[]>(index.version + '/' + key + '.json')).catch((error: unknown) => {
       chunks.delete(key)
       throw error
     })
