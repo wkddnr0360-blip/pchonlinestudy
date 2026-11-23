@@ -104,3 +104,7 @@
   .teacher-orb { width: 97px; right: 11%; bottom: 10px; }
   .teacher-orb .teacher-control { --sprite: 126px; bottom: -7px; }
 }
+
+.challenge-link { grid-column: 1 / -1; background: #eeeeff; border-color: #dfe2fc; }
+
+.preview-stage-grid { grid-template-columns: minmax(0, 1fr); }

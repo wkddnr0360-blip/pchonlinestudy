@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, ArrowRight, BookOpen, Check, ListChecks } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { getQuestions } from '../book/catalog'
+import { isStageOpen } from '../book/publicPreview'
+import { LockedPreview } from '../app/LockedPreview'
 import type { BookIndex, Ox, Question } from '../book/types'
 import { playReward } from '../feedback/audio'
 import { useFeedbackPreferences } from '../feedback/preferences'
@@ -99,5 +101,6 @@ export default function StudyPage({ book }: { book: BookIndex }) {
   const session = useLiveQuery(() => db.studies.get(key), [key], null)
   if (session === null) return <Loading />
   if (!session) return <ErrorNotice message="목차에서 새로운 학습을 시작해 주세요." />
+  if (!isStageOpen(session.scope.stage)) return <LockedPreview title={session.scope.stage + '단계 잠김'} />
   return <StudySessionView key={session.id} book={book} session={session} />
 }

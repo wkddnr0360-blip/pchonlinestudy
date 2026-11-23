@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, ListOrdered, Play, Shuffle } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { stages, validStage } from '../app/stages'
+import { LockedPreview } from '../app/LockedPreview'
+import { isStageOpen } from '../book/publicPreview'
 import { getQuestions } from '../book/catalog'
 import type { BookIndex, Scope } from '../book/types'
 import { db } from '../storage/db'
@@ -74,6 +76,7 @@ export default function StagePage({ book }: { book: BookIndex }) {
   const { stage } = useParams()
   const [selection, setSelection] = useState<Selection>()
   if (!validStage(stage)) return <ErrorNotice message="단계를 찾을 수 없습니다." />
+  if (!isStageOpen(Number(stage))) return <LockedPreview title={stage + '단계 잠김'} />
   const model = stages[Number(stage) - 1]
   const data = book.stages[Number(stage) - 1]
   const stageScope = { stage: model.number }

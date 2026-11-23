@@ -1,0 +1,6 @@
+Level 1, Level 2, Level 3
+Juhani Junkala (SubspaceAudio), 5 Chiptunes (Action)
+CC0 1.0 Universal
+https://opengameart.org/content/5-chiptunes-action
+https://creativecommons.org/publicdomain/zero/1.0/
+The original WAV tracks were converted to mono MP3 and level-adjusted for the web.

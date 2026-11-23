@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isFirstStageExam } from '../book/publicPreview'
 import { EXAM_COUNT, correctOption } from '../exam/generate'
 import { db } from './db'
 
@@ -45,9 +46,12 @@ const backupSchema = z.object({
     examId: z.uuid().optional(), examPosition: examPosition.optional(), at: timestamp, resolved: z.boolean(),
   })),
   settings: z.array(z.object({ key: z.enum(['patchRead', 'releaseSeen', 'feedback']), value: z.string() })),
+  challengeScores: z.array(z.object({
+    scope: z.string().regex(/^(all|[12]-[1-7])$/), cleared: timestamp, correct: timestamp, at: timestamp,
+  })).default([]),
 })
 
-const tables = [db.studies, db.attempts, db.exams, db.reviews, db.settings]
+const tables = [db.studies, db.attempts, db.exams, db.reviews, db.settings, db.challengeScores]
 
 export type Backup = z.infer<typeof backupSchema>
 
@@ -55,7 +59,9 @@ export function readBackup(value: unknown): Backup {
   const parsed = backupSchema.safeParse(value)
   if (!parsed.success) throw new Error('이 앱의 백업 형식과 맞지 않거나 파일이 손상되었습니다.')
   const backup = parsed.data
-  if (backup.exams.filter((exam) => exam.status === 'active').length > 1) throw new Error('진행 중인 시험 기록이 중복됩니다.')
+  const active = backup.exams.filter((exam) => exam.status === 'active')
+  const activeScopes = new Set(active.map(isFirstStageExam))
+  if (active.length !== activeScopes.size) throw new Error('진행 중인 시험 기록이 중복됩니다.')
   const exams = new Map(backup.exams.map((exam) => [exam.id, exam]))
   for (const review of backup.reviews) {
     if (review.type !== 'exam') continue
@@ -73,6 +79,7 @@ export async function exportBackup(): Promise<Backup> {
     format: 'police-constitution-ox', schemaVersion: 1, exportedAt: Date.now(),
     studies: await db.studies.toArray(), attempts: await db.attempts.toArray(), exams: await db.exams.toArray(),
     reviews: await db.reviews.toArray(), settings: await db.settings.toArray(),
+    challengeScores: await db.challengeScores.toArray(),
   }))
 }
 
@@ -84,5 +91,6 @@ export async function restoreBackup(backup: Backup) {
     await db.exams.bulkAdd(backup.exams)
     await db.reviews.bulkAdd(backup.reviews)
     await db.settings.bulkAdd(backup.settings)
+    await db.challengeScores.bulkAdd(backup.challengeScores)
   })
 }

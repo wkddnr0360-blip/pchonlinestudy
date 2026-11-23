@@ -1,0 +1,87 @@
+.challenge-page { max-width: 870px; margin-inline: auto; }
+.challenge-scene {
+  --scene-position: 0%;
+  position: relative; isolation: isolate; overflow: hidden; min-height: clamp(176px, 34vw, 265px);
+  background: #39406d url('/challenge/archive-scenes.webp') var(--scene-position) 52% / 300% auto no-repeat;
+  border: 3px solid #3b4168; border-radius: 17px; box-shadow: 0 9px 20px #28325d25;
+}
+.scene-dusk { --scene-position: 50%; border-color: #615798; }
+.scene-night { --scene-position: 100%; border-color: #444884; }
+.scene-shade {
+  position: absolute; z-index: -1; inset: 0;
+  background: linear-gradient(#181633ad, #1a184021 45%, transparent 70%, #10132475);
+}
+.scene-head { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px 13px; color: #fff; }
+.scene-head > div:first-child { display: grid; gap: 2px; padding: 6px 8px; background: #181a3dc4; border-radius: 6px; }
+.scene-head span { font-size: 12px; font-weight: 780; color: #efdf9f; }
+.scene-head strong { font-size: 16px; }
+.life-row { display: flex; align-items: center; gap: 3px; padding: 6px; background: #1d163cc9; border-radius: 6px; color: #ff8ca1; }
+.challenge-trail {
+  position: absolute; left: 9%; right: 9%; bottom: 16px; display: flex; justify-content: space-between; align-items: center;
+  transform: translateY(50%);
+}
+.challenge-trail::before { content: ''; width: 100%; height: 3px; position: absolute; z-index: -1; background: #d4d9eb9e; }
+.challenge-trail span { width: 13px; height: 13px; border: 2px solid #c5cbed; background: #292d56; transform: rotate(45deg); }
+.challenge-trail .passed { border-color: #ffe69e; background: #f2c753; box-shadow: 0 0 12px #ffde6c99; }
+.challenge-player {
+  position: absolute; z-index: 1; bottom: 22px; transform: translateX(-50%);
+  transition: left .46s cubic-bezier(.21,.68,.16,1);
+  filter: drop-shadow(0 3px 2px #141837ad) drop-shadow(0 0 1px #f0efff);
+}
+.challenge-player .teacher { --sprite: clamp(98px, 20vw, 158px); }
+.challenge-toolbar { display: flex; align-items: center; gap: 5px; margin-bottom: 7px; }
+.challenge-toolbar strong { margin-right: auto; color: var(--muted); font-size: 13px; }
+.challenge-toolbar .icon-button { background: #f1f3fc; }
+.challenge-intro, .challenge-result-card, .challenge-clear { padding: 18px; margin-top: 11px; }
+.challenge-intro .tag { gap: 5px; }
+.challenge-intro h1, .challenge-result-card h1, .challenge-clear h1 {
+  letter-spacing: -.053em; margin: 7px 0; font-size: clamp(24px, 5vw, 39px);
+}
+.challenge-intro p, .challenge-result-card p { color: var(--muted); line-height: 1.55; }
+.challenge-rules { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 10px 0 14px; }
+.challenge-rules span { padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 13px; }
+.challenge-intro select { border: 1px solid var(--border); color: var(--text); background: #fff; border-radius: 10px; min-height: 46px; padding: 8px 11px; }
+.challenge-launch { display: flex; gap: 7px; }
+.challenge-launch .button { flex: 1; }
+.challenge-launch .icon-button { background: #edf0ff; }
+.challenge-best { margin-top: 11px; font-size: 13px; }
+.music-credit { color: var(--quiet); font-size: 12px; text-decoration: underline; display: inline-block; margin-top: 10px; }
+.challenge-score-strip {
+  display: flex; justify-content: center; gap: 18px; margin: 8px 0; padding: 7px 9px;
+  border: 1px solid #e1e5f4; border-radius: 10px; background: #edf0fb;
+  color: #4e5978; font-size: 13px;
+}
+.challenge-score-strip strong { color: #3444a3; font-variant-numeric: tabular-nums; }
+.challenge-question { padding: 14px; }
+.challenge-question .question-label { margin-bottom: 8px; }
+.challenge-question .question-prompt { margin-block: 10px; }
+.challenge-question .source-line { margin: 0; }
+.challenge-controls {
+  position: sticky; z-index: 3; bottom: 0; padding: 7px 2px 4px;
+  background: #f7f8fdf5;
+}
+.challenge-controls .ox-buttons { margin-top: 0; }
+.challenge-controls .ox-option { min-height: 60px; }
+.challenge-timer {
+  display: flex; align-items: center; gap: 7px; color: #3444a3; padding: 8px 9px;
+  background: #edf0ff; border-radius: 9px; font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 760;
+}
+.challenge-timer.urgent { background: #fff0e6; color: #a24231; }
+.challenge-timer > div { height: 5px; flex: 1; margin-left: 3px; border-radius: 12px; background: #bac4f26b; overflow: hidden; }
+.challenge-timer i { display: block; height: 100%; border-radius: inherit; background: currentColor; }
+.challenge-feedback { padding: 8px 9px; font-size: 14px; border-radius: 9px; font-weight: 750; }
+.challenge-feedback.success { color: #236b4d; background: #e6f6ef; }
+.challenge-feedback.missed { color: #933b54; background: #feeaef; }
+.challenge-clear, .challenge-result-card { text-align: center; }
+.challenge-clear .button { margin-top: 6px; }
+.challenge-result-card .button-row { margin-top: 13px; justify-content: center; }
+.challenge-result-card h1 strong { color: var(--primary); }
+@media (max-width: 680px) {
+  .challenge-controls { bottom: calc(55px + env(safe-area-inset-bottom)); }
+  .challenge-question { padding: 12px; }
+  .challenge-scene { background-size: 300% auto; }
+  .scene-head strong { font-size: 14px; }
+  .challenge-player .teacher { --sprite: clamp(90px, 16vw, 110px); }
+  .challenge-score-strip { gap: 10px; }
+  .challenge-intro select { font-size: 16px; }
+}

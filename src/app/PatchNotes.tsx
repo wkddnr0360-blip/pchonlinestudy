@@ -1,3 +1,4 @@
+import { publicPreview } from '../book/publicPreview'
 import { db } from '../storage/db'
 import { Modal } from '../ui/Controls'
 
@@ -11,11 +12,11 @@ export function PatchNotes({ close }: { close: () => void }) {
   return <Modal title="패치노트" close={close}>
     <article className="patch-entry">
       <span className="tag">{RELEASE_CHANNEL} {RELEASE_NUMBER}</span>
-      <h3>박철한 온스 테스트 업데이트</h3>
+      <h3>{publicPreview ? "임시 공개판" : "무한회독 챌린지 업데이트"}</h3>
       <ul>
-        <li>오답을 교재 목차 순서로 묶었어요.</li>
-        <li>철한쌤을 터치하면 단계별 모션이 나와요.</li>
-        <li>설정에서 자동 백업 위치와 정답 효과음을 고를 수 있어요.</li>
+        <li>모의고사 오답을 교재 번호 하나로 모아요.</li>
+        <li>{publicPreview ? "1단계 OX와 1단계 지문으로 구성한 실전 모의고사를 열었어요." : "2·3단계 지문으로 도트 서재에서 기록에 도전해요."}</li>
+        <li>터치음과 정답음을 새로 만들었어요.</li>
       </ul>
     </article>
   </Modal>

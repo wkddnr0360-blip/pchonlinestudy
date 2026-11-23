@@ -1,5 +1,6 @@
 import type { Ox, Question } from '../book/types'
 import { db, type StudySession } from './db'
+import { makeOxReview } from './reviews'
 
 export function answerStudy(session: StudySession, question: Question, answer: Ox) {
   return db.transaction('rw', db.studies, db.attempts, db.reviews, async () => {
@@ -10,12 +11,7 @@ export function answerStudy(session: StudySession, question: Question, answer: O
     const at = Date.now()
     const correct = answer === question.answer
     await db.attempts.add({ id, sessionId: session.id, no: question.no, answer, correct, at })
-    if (!correct) {
-      await db.reviews.put({
-        id: question.id, type: 'ox', no: question.no, chapterKey: question.chapterKey,
-        stage: question.stage, at, resolved: false,
-      })
-    }
+    if (!correct) await db.reviews.put(makeOxReview(question, at))
     await db.studies.update(session.key, { updatedAt: at })
     return correct
   })

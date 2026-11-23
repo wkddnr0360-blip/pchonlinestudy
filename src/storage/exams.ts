@@ -1,8 +1,10 @@
+import { isExamOpen } from '../book/publicPreview'
 import { correctOption, type ExamQuestion } from '../exam/generate'
 import { db, type ExamSession, type ReviewItem } from './db'
+import { makeOxReview } from './reviews'
 
 export async function activeExam() {
-  return db.exams.where('status').equals('active').first()
+  return db.exams.where('status').equals('active').filter(isExamOpen).first()
 }
 
 export async function startExam(questions: ExamQuestion[], minutes: number, version: string, now = Date.now()) {
@@ -37,12 +39,7 @@ export async function submitExam(id: string, now = Date.now()) {
     exam.questions.forEach((question, position) => {
       const correct = correctOption(question)
       if (exam.responses[position] === correct) return
-      const representative = question.options[correct]
-      reviews.push({
-        id: id + ':' + position, type: 'exam', examId: id, examPosition: position,
-        no: representative.no, chapterKey: representative.chapterKey, stage: representative.stage,
-        at: Math.min(now, exam.deadline), resolved: false,
-      })
+      reviews.push(makeOxReview(question.options[correct], Math.min(now, exam.deadline)))
     })
     const updated = { ...exam, status: 'submitted' as const, submittedAt: Math.min(now, exam.deadline) }
     await db.exams.put(updated)

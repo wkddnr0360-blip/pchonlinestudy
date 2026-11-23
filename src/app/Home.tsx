@@ -1,20 +1,26 @@
-import { ArrowRight, BookOpen, ChevronRight, ClipboardList, Clock3, Repeat2, Infinity } from 'lucide-react'
+import { ArrowRight, BookOpen, ChevronRight, ClipboardList, Clock3, Repeat2, Infinity, Gamepad2, LockKeyhole } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import type { BookIndex } from '../book/types'
+import { isStageOpen, publicPreview } from '../book/publicPreview'
 import { db } from '../storage/db'
+import { unifyReviews } from '../storage/reviews'
 import { TeacherButton } from '../ui/TeacherButton'
 import { ReleaseBanner } from './ReleaseBanner'
 import { stages } from './stages'
 
 export function Home({ book }: { book: BookIndex }) {
   const answered = useLiveQuery(() => db.attempts.orderBy('no').uniqueKeys(), [], [])
-  const pending = useLiveQuery(() => db.reviews.filter((item) => !item.resolved).count(), [], 0)
-  const latest = useLiveQuery(() => db.studies.orderBy('updatedAt').last())
-  const count = answered.length
+  const pending = useLiveQuery(async () => unifyReviews(await db.reviews.toArray()).filter((item) => isStageOpen(item.stage) && !item.resolved).length, [], 0)
+  const latest = useLiveQuery(() => db.studies.orderBy('updatedAt').filter((session) => isStageOpen(session.scope.stage)).last())
+  const count = answered.filter((no) => typeof no === 'number' && no <= book.count).length
   const progress = Math.round(count / book.count * 100)
   return <>
     <ReleaseBanner />
+    {publicPreview && <aside className="release-notice" aria-label="임시 공개 범위">
+      <LockKeyhole size={18} aria-hidden="true" />
+      <div><strong>임시 공개</strong><span>1단계와 실전 모의고사를 이용할 수 있어요.</span></div>
+    </aside>}
     <div className="hero-grid">
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-rings" aria-hidden="true"><i /><i /><i /></div>
@@ -26,7 +32,7 @@ export function Home({ book }: { book: BookIndex }) {
             {latest ? '이어 풀기' : '학습 시작'} <ArrowRight size={17} />
           </Link>
         </div>
-        <TeacherButton stage={3} className="hero-teacher" />
+        <TeacherButton stage={publicPreview ? 1 : 3} className="hero-teacher" />
       </section>
       <section className="dashboard-progress" aria-labelledby="progress-title">
         <div className="panel-title">
@@ -42,9 +48,9 @@ export function Home({ book }: { book: BookIndex }) {
 
     <section className="home-section" aria-labelledby="levels-title">
       <div className="section-heading"><h2 id="levels-title">단계별 학습</h2></div>
-      <div className="stage-grid">
-        {stages.map((stage) => {
-          const total = book.stages[stage.number - 1].parts.reduce((sum, part) => sum + part.count, 0)
+      <div className={publicPreview ? "stage-grid preview-stage-grid" : "stage-grid"}>
+        {stages.filter(({ number }) => isStageOpen(number)).map((stage) => {
+          const total = book.stages.find((item) => item.stage === stage.number)?.parts.reduce((sum, part) => sum + part.count, 0) ?? 0
           return <article className={'stage-card ' + stage.color} key={stage.number}>
             <Link className="stage-link" to={'/stage/' + stage.number}>
               <span className="tag">{stage.number}단계</span>
@@ -61,6 +67,11 @@ export function Home({ book }: { book: BookIndex }) {
     <section className="home-section" aria-labelledby="practice-title">
       <div className="section-heading"><h2 id="practice-title">실전과 복습</h2></div>
       <div className="quick-grid">
+        {!publicPreview && <Link className="quick-card challenge-link" to="/challenge">
+          <span className="small-icon primary-icon"><Gamepad2 size={22} /></span>
+          <div><strong>무한회독 챌린지</strong><span>도트 서재에서 스테이지 기록에 도전</span></div>
+          <ChevronRight className="quick-arrow" size={20} />
+        </Link>}
         <Link className="quick-card" to="/exam">
           <span className="small-icon primary-icon"><Clock3 size={22} /></span>
           <div><strong>실전 모의고사</strong><span>4지선다 20문항 · 시간 설정</span></div>

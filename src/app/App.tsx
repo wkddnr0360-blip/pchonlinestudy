@@ -3,12 +3,14 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Bell, BookOpen, ClipboardList, Clock3, Settings } from 'lucide-react'
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { getBookIndex } from '../book/catalog'
+import { publicPreview } from '../book/publicPreview'
 import type { BookIndex } from '../book/types'
 import { FeedbackEffects } from '../feedback/FeedbackEffects'
 import { AutoBackupRunner } from '../storage/AutoBackupRunner'
 import { db } from '../storage/db'
 import { ErrorNotice, Loading } from '../ui/Controls'
 import { Home } from './Home'
+import { LockedPreview } from './LockedPreview'
 import { markNotesRead, PatchNotes } from './PatchNotes'
 import { APP_NAME, APP_VERSION, RELEASE_CHANNEL } from './release'
 import { AppUpdateNotice } from './updates/AppUpdateNotice'
@@ -19,6 +21,7 @@ const ExamLobby = lazy(() => import('../exam/ExamLobby'))
 const ExamPage = lazy(() => import('../exam/ExamPage'))
 const ReviewPage = lazy(() => import('../review/ReviewPage'))
 const SettingsPage = lazy(() => import('../storage/SettingsPage'))
+const ChallengePage = lazy(() => import('../challenge/ChallengePage'))
 
 const navigation = [
   { to: '/', title: '학습 홈', icon: BookOpen },
@@ -80,6 +83,7 @@ export function App() {
             <Route path="/exam" element={<ExamLobby book={book} />} />
             <Route path="/exam/:id" element={<ExamPage />} />
             <Route path="/review" element={<ReviewPage book={book} />} />
+            <Route path="/challenge" element={publicPreview ? <LockedPreview title="챌린지 잠김" /> : <ChallengePage book={book} />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

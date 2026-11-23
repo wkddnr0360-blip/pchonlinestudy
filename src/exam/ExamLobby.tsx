@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowRight, ClipboardCheck, Clock3, ListChecks, Play } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getQuestions } from '../book/catalog'
+import { isExamOpen, publicPreview } from '../book/publicPreview'
 import type { BookIndex } from '../book/types'
 import { db } from '../storage/db'
 import { activeExam, startExam } from '../storage/exams'
@@ -11,7 +12,7 @@ import { DEFAULT_MINUTES, EXAM_COUNT, generateExam } from './generate'
 
 export default function ExamLobby({ book }: { book: BookIndex }) {
   const running = useLiveQuery(activeExam)
-  const recent = useLiveQuery(() => db.exams.orderBy('startedAt').reverse().filter((exam) => exam.status === 'submitted').limit(5).toArray(), [], [])
+  const recent = useLiveQuery(() => db.exams.orderBy('startedAt').reverse().filter((exam) => exam.status === 'submitted' && isExamOpen(exam)).limit(5).toArray(), [], [])
   const [minutes, setMinutes] = useState(String(DEFAULT_MINUTES))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -38,7 +39,7 @@ export default function ExamLobby({ book }: { book: BookIndex }) {
   }
 
   return <div className="narrow-page">
-    <ParagraphHeading title="실전 모의고사" description="세 단계의 교재 지문을 섞어 실전처럼 풀어보세요." />
+    <ParagraphHeading title="실전 모의고사" description={publicPreview ? "1단계 교재 지문으로 실전처럼 풀어보세요." : "세 단계의 교재 지문을 섞어 실전처럼 풀어보세요."} />
     <section className="surface exam-setup">
       <div className="exam-facts">
         <span><ListChecks size={19} /> 4지선다 {EXAM_COUNT}문항</span>

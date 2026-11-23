@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PAGES_BASE: /${{ github.event.repository.name }}/
+      PAGES_PREVIEW: "1"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -31,6 +32,13 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Build and verify temporary public preview
+        if: env.PAGES_PREVIEW == '1'
+        env:
+          VITE_PUBLIC_PREVIEW: "1"
+        run: |
+          npm run build
+          npm run test:e2e -- tests/public-preview.e2e.ts
       - uses: actions/upload-pages-artifact@v4
         if: github.event_name != 'pull_request'
         with:

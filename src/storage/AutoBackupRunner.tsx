@@ -3,7 +3,7 @@ import Dexie, { type ObservabilitySet } from 'dexie'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
 
-const backupTables = ['studies', 'attempts', 'exams', 'reviews', 'settings']
+const backupTables = ['studies', 'attempts', 'exams', 'reviews', 'settings', 'challengeScores']
 const prefixes = backupTables.map((table) => 'idb://' + db.name + '/' + table + '/')
 
 export function AutoBackupRunner() {

@@ -61,6 +61,13 @@ export interface BackupSnapshot {
   json: string
 }
 
+export interface ChallengeScore {
+  scope: string
+  cleared: number
+  correct: number
+  at: number
+}
+
 export class StudyDatabase extends Dexie {
   studies!: EntityTable<StudySession, 'key'>
   attempts!: EntityTable<OxAttempt, 'id'>
@@ -69,6 +76,7 @@ export class StudyDatabase extends Dexie {
   settings!: EntityTable<Setting, 'key'>
   backupTargets!: EntityTable<BackupTarget, 'key'>
   snapshots!: EntityTable<BackupSnapshot, 'at'>
+  challengeScores!: EntityTable<ChallengeScore, 'scope'>
 
   constructor(name = 'police-constitution-ox') {
     super(name)
@@ -80,6 +88,7 @@ export class StudyDatabase extends Dexie {
       settings: 'key',
     })
     this.version(2).stores({ backupTargets: 'key', snapshots: 'at' })
+    this.version(3).stores({ reviews: 'id,stage,chapterKey,at,no', challengeScores: 'scope' })
   }
 }
 

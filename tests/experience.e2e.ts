@@ -10,7 +10,7 @@ test('chapter study, source, pixel feedback, and offline review', async ({ page,
     }
   })
   await page.getByRole('button', { name: '패치노트' }).click()
-  await expect(page.getByRole('dialog')).toContainText('Canary 1.1.0')
+  await expect(page.getByRole('dialog')).toContainText('Canary 1.2.0')
   await page.getByRole('button', { name: '닫기' }).click()
   await page.getByRole('link', { name: '학습 시작' }).click()
   await page.getByRole('button', { name: /제1장 헌법의 개념과 헌법학/ }).click()
@@ -51,6 +51,12 @@ test('timed mock survives a reload and submits after its deadline', async ({ pag
   await expect(page.getByText('모의고사 결과')).toBeVisible()
   await page.getByRole('button', { name: /^1번/ }).click()
   await expect(page.getByText('기출 출처', { exact: true })).toHaveCount(4)
+  const nav = page.getByRole('navigation', { name: /주 메뉴/ }).filter({ visible: true })
+  await nav.getByRole('link', { name: '오답노트' }).click()
+  const record = page.getByRole('region', { name: '오답 목록' })
+  await expect(record.getByRole('button', { name: /^모의고사/ })).toHaveCount(0)
+  await record.getByRole('button', { name: /^교재 [\d,]+번$/ }).first().click()
+  await expect(page.getByRole('button', { name: 'O 옳다' })).toBeVisible()
 })
 
 test('random chapter draw and file backup round trip', async ({ page }) => {

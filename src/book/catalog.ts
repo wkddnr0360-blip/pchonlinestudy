@@ -1,4 +1,5 @@
 import type { BookIndex, Question, Scope } from './types'
+import { isStageOpen, limitBookIndex } from './publicPreview'
 
 let index: Promise<BookIndex> | undefined
 const chunks = new Map<string, Promise<Question[]>>()
@@ -11,7 +12,7 @@ async function readJson<T>(path: string): Promise<T> {
 }
 
 export function getBookIndex() {
-  index ??= readJson<BookIndex>('manifest.json').catch((error: unknown) => {
+  index ??= readJson<BookIndex>('manifest.json').then(limitBookIndex).catch((error: unknown) => {
     index = undefined
     throw error
   })
@@ -19,6 +20,7 @@ export function getBookIndex() {
 }
 
 export function getChapter(index: BookIndex, key: string) {
+  if (!isStageOpen(Number(key.split('-')[0]))) return Promise.reject(new Error('잠긴 학습 범위입니다.'))
   if (!chunks.has(key)) {
     const request = readJson<Question[]>(index.version + '/' + key + '.json').catch((error: unknown) => {
       chunks.delete(key)
@@ -31,7 +33,7 @@ export function getChapter(index: BookIndex, key: string) {
 
 export async function getQuestions(index: BookIndex, scope?: Scope) {
   const chapters = index.stages
-    .filter((stage) => !scope || stage.stage === scope.stage)
+    .filter(({ stage }) => isStageOpen(stage) && (!scope || stage === scope.stage))
     .flatMap((stage) => stage.parts.filter((part) => !scope?.part || part.number === scope.part))
     .flatMap((part) => part.chapters)
     .filter((chapter) => !scope?.chapterKey || chapter.key === scope.chapterKey)

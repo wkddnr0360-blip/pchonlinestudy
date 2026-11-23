@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, ArrowRight, Send } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
+import { isExamOpen } from '../book/publicPreview'
+import { LockedPreview } from '../app/LockedPreview'
 import { db, type ExamSession } from '../storage/db'
 import { changeExam, submitExam } from '../storage/exams'
 import { ErrorNotice, Loading, Modal } from '../ui/Controls'
@@ -81,5 +83,6 @@ export default function ExamPage() {
   const exam = useLiveQuery(() => id ? db.exams.get(id) : undefined, [id], null)
   if (exam === null) return <Loading />
   if (!exam) return <ErrorNotice message="모의고사 기록을 찾을 수 없습니다." />
+  if (!isExamOpen(exam)) return <LockedPreview title="이 모의고사는 잠겨 있어요" />
   return exam.status === 'submitted' ? <ExamResults exam={exam} /> : <ExamRunner key={exam.id} exam={exam} />
 }

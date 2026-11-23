@@ -10,7 +10,7 @@ export function AppUpdateNotice() {
   const exam = useLiveQuery(async () => available ? (await activeExam()) ?? null : null, [available])
   if (!available) return null
 
-  const studying = pathname.startsWith('/study/')
+  const studying = pathname.startsWith('/study/') || pathname === '/challenge'
   const takingExam = !!exam
   const canApply = !studying && !takingExam && exam !== undefined
 
