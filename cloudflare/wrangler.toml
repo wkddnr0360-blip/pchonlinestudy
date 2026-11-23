@@ -1,0 +1,16 @@
+name = "pchonlinestudy-premium-api"
+main = "worker.mjs"
+compatibility_date = "2026-11-23"
+
+[vars]
+ALLOWED_ORIGIN = "https://wkddnr0360-blip.github.io"
+BOOK_VERSION = "3f81c1c4298504cd"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pchonlinestudy-premium"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "BOOK"
+bucket_name = "pchonlinestudy-premium-book"
