@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Bell, BookOpen, ClipboardList, Clock3, Settings } from 'lucide-react'
+import { Bell, BookOpen, ClipboardList, Clock3, Settings, LockKeyhole } from 'lucide-react'
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { getBookIndex } from '../book/catalog'
 import type { BookIndex } from '../book/types'
@@ -20,6 +20,7 @@ const ExamLobby = lazy(() => import('../exam/ExamLobby'))
 const ExamPage = lazy(() => import('../exam/ExamPage'))
 const ReviewPage = lazy(() => import('../review/ReviewPage'))
 const SettingsPage = lazy(() => import('../storage/SettingsPage'))
+const PremiumAccount = lazy(() => import('../premium/PremiumAccount'))
 
 const navigation = [
   { to: '/', title: '학습 홈', icon: BookOpen },
@@ -71,6 +72,7 @@ export function App() {
         </Link>
         <nav className="main-nav" aria-label="주 메뉴">{tabs}</nav>
         <div className="header-actions">
+          <Link className="icon-button" to="/membership" aria-label="회원 및 유료 이용권 관리"><LockKeyhole size={21} /></Link>
           <Link className="icon-button" to="/settings" aria-label="학습 기록 설정"><Settings size={21} /></Link>
           <button className="icon-button notification-button" aria-label="패치노트" onClick={() => {
             setNotes(true)
@@ -93,6 +95,7 @@ export function App() {
             <Route path="/exam/:id" element={<PremiumGate title="실전 모의고사"><ExamPage /></PremiumGate>} />
             <Route path="/review" element={<ReviewPage book={book} />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/membership" element={<PremiumAccount />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>}
