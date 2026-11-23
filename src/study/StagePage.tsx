@@ -8,6 +8,7 @@ import { isStageOpen } from '../book/publicPreview'
 import { getQuestions } from '../book/catalog'
 import type { BookIndex, Scope } from '../book/types'
 import { db } from '../storage/db'
+import { createRecordId } from '../storage/recordId'
 import { ErrorNotice, Modal } from '../ui/Controls'
 import { TeacherButton } from '../ui/TeacherButton'
 import { scopeKey, shuffle } from './selection'
@@ -40,7 +41,7 @@ function StartStudy({ book, selection, close }: { book: BookIndex; selection: Se
       if (!available.length) throw new Error('학습할 문제가 없습니다.')
       const numbers = (mode === 'random' ? shuffle(available).slice(0, size) : available).map((question) => question.no)
       await db.studies.put({
-        key, id: crypto.randomUUID(), version: book.version, scope, mode, numbers,
+        key, id: createRecordId(), version: book.version, scope, mode, numbers,
         position: 0, updatedAt: Date.now(),
       })
       navigate('/study/' + key)

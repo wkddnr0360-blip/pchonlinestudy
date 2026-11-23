@@ -6,6 +6,7 @@ import { backupFileName } from './autoBackup'
 import { readBackup, type Backup } from './backup'
 import { chooseBackupFolder, supportsBackupFolder } from './backupFolder'
 import { db, type BackupTarget } from './db'
+import { createRecordId } from './recordId'
 
 export function AutoBackupSettings({ onRestore }: { onRestore: (backup: Backup) => void }) {
   const target = useLiveQuery(() => db.backupTargets.get('primary'))
@@ -24,7 +25,7 @@ export function AutoBackupSettings({ onRestore }: { onRestore: (backup: Backup) 
       } else {
         const folder = destination === 'folder' ? await chooseBackupFolder() : undefined
         if (destination === 'folder' && !folder) return
-        await db.backupTargets.put({ key: 'primary', id: crypto.randomUUID(), destination, folder })
+        await db.backupTargets.put({ key: 'primary', id: createRecordId(), destination, folder })
       }
     } catch (err) {
       if (!(err instanceof DOMException && err.name === 'AbortError')) setError('자동 백업 위치를 설정하지 못했습니다.')

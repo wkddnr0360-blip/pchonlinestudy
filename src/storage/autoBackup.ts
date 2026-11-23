@@ -19,8 +19,10 @@ async function updateTarget(target: BackupTarget, changes: Partial<BackupTarget>
 
 async function hashBackup(backup: Backup) {
   const contents = new TextEncoder().encode(JSON.stringify({ ...backup, exportedAt: 0 }))
-  const hash = await crypto.subtle.digest('SHA-256', contents)
-  return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  const hash = crypto.subtle
+    ? new Uint8Array(await crypto.subtle.digest('SHA-256', contents))
+    : (await import('@noble/hashes/sha2.js')).sha256(contents)
+  return Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 async function saveToDevice(target: BackupTarget, backup: Backup, digest: string, json: string) {

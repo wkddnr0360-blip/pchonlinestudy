@@ -51,8 +51,8 @@
 .stage-card { min-height: 184px; display: block; background: var(--tint); border: 1px solid var(--edge); border-radius: 22px; position: relative; isolation: isolate; overflow: hidden; transition: transform .2s ease, box-shadow .2s ease; }
 .stage-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .stage-card .tag, .stage-banner .tag { background: var(--pill); color: var(--accent); }
-.stage-card h3 { margin-top: 9px; font-size: clamp(18px, 2vw, 23px); font-weight: 800; letter-spacing: -.055em; z-index: 1; position: relative; }
-.stage-card p { margin-top: 4px; color: #495570; font-size: 13px; letter-spacing: -.03em; z-index: 1; position: relative; max-width: 67%; }
+.stage-title { display: block; margin-top: 9px; font-size: clamp(18px, 2vw, 23px); font-weight: 800; letter-spacing: -.055em; z-index: 1; position: relative; }
+.stage-description { display: block; margin-top: 4px; color: #495570; font-size: 13px; letter-spacing: -.03em; z-index: 1; position: relative; max-width: 67%; }
 .stage-count { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 800; font-size: 13px; margin-top: 16px; z-index: 1; position: relative; }
 .teacher-orb { position: absolute; width: clamp(75px, 13vw, 140px); aspect-ratio: 1; right: 3%; bottom: 9px; background: var(--orb); border-radius: 50%; z-index: 2; pointer-events: none; }
 .teacher-orb .teacher-control { --sprite: clamp(124px, 15.8vw, 176px); position: absolute; left: 50%; bottom: -7px; margin-left: calc(var(--sprite) * -.29); }
@@ -78,7 +78,7 @@
   .hero-teacher { --sprite: 212px; right: 4px; }
   .stage-grid { gap: 10px; }
   .stage-card .stage-link { padding-left: 13px; }
-  .stage-card p { max-width: 63%; }
+  .stage-card .stage-description { max-width: 63%; }
 }
 @media (max-width: 680px) {
   .hero-grid { grid-template-columns: 1fr; gap: 12px; }
@@ -99,7 +99,7 @@
   .stage-grid, .quick-grid { grid-template-columns: 1fr; gap: 9px; }
   .stage-card { min-height: 132px; }
   .stage-card .stage-link { padding: 13px 15px; }
-  .stage-card h3 { margin-top: 6px; font-size: 20px; }
+  .stage-title { margin-top: 6px; font-size: 20px; }
   .stage-count { margin-top: 9px; }
   .teacher-orb { width: 97px; right: 11%; bottom: 10px; }
   .teacher-orb .teacher-control { --sprite: 126px; bottom: -7px; }
@@ -107,4 +107,9 @@
 
 .challenge-link { grid-column: 1 / -1; background: #eeeeff; border-color: #dfe2fc; }
 
-.preview-stage-grid { grid-template-columns: minmax(0, 1fr); }
+.stage-preview-trigger { width: 100%; background: transparent; border: 0; text-align: left; }
+.stage-preview-art {
+  display: grid; place-items: center; padding: 12px; margin: 4px 0 16px;
+  background: var(--tint); border-radius: 18px;
+}
+.stage-preview-art .teacher-control { --sprite: 132px; }

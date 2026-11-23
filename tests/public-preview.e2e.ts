@@ -4,10 +4,55 @@ import { book, questions, seeded } from './fixtures'
 
 test.skip(process.env.VITE_PUBLIC_PREVIEW !== '1', 'Run against the restricted public artifact.')
 
+test('study, mock exams, and device backup work before HTTPS is available', async ({ page, baseURL }) => {
+  const origin = 'http://ons.test'
+  const app = new URL(baseURL!)
+  await page.route(origin + '/**', async (route) => {
+    const local = new URL(route.request().url())
+    const response = await route.fetch({ url: app.origin + local.pathname + local.search })
+    await route.fulfill({ response })
+  })
+  const home = origin + app.pathname
+  await page.goto(home + '#/stage/1')
+  expect(await page.evaluate(() => window.isSecureContext)).toBe(false)
+  await page.getByRole('button', { name: '전체 풀기', exact: true }).click()
+  await page.getByRole('button', { name: '문제 풀기', exact: true }).click()
+  await expect(page.getByText('교재 1번')).toBeVisible()
+  await page.getByRole('button', { name: 'X 틀리다' }).click()
+  await expect(page.getByText('오답노트에 담았어요.')).toBeVisible()
+  await page.getByRole('button', { name: '다음' }).click()
+  await page.reload()
+  await expect(page.getByText('교재 2번')).toBeVisible()
+
+  await page.goto(home + '#/exam')
+  await page.getByRole('button', { name: '모의고사 시작' }).click()
+  const options = page.getByRole('group', { name: '보기' }).getByRole('button')
+  await expect(options).toHaveCount(4)
+  await options.first().click()
+  await page.reload()
+  await expect(options.first()).toHaveAttribute('aria-pressed', 'true')
+
+  await page.goto(home + '#/settings')
+  await page.getByRole('button', { name: '이 기기 보관함' }).click()
+  const saved = page.getByRole('list', { name: '기기에 저장된 자동 백업' }).getByRole('listitem')
+  await saved.first().getByRole('button', { name: '복원' }).click()
+  await expect(page.getByRole('dialog', { name: '이 백업으로 복원할까요?' })).toContainText('OX 답안 1개')
+})
+
 test('the public artifact exposes just stage one data and keeps direct routes locked', async ({ page, request, baseURL }) => {
   await page.goto('./')
   await expect(page.getByRole('complementary', { name: '임시 공개 범위' })).toBeVisible()
-  await expect(page.locator('.stage-grid a')).toHaveCount(1)
+  const cards = page.locator('.stage-grid')
+  await expect(cards.getByRole('link')).toHaveCount(1)
+  for (const level of [2, 3]) {
+    const card = cards.getByRole('button', { name: new RegExp('^' + level + '단계 .*정식 오픈 예정') })
+    await card.click()
+    const dialog = page.getByRole('dialog', { name: '정식오픈을 기다려주세요!' })
+    await expect(dialog.locator('.teacher-' + level + '.teacher-reacting')).toBeVisible()
+    await dialog.getByRole('button', { name: '확인', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page).toHaveURL(baseURL!)
+  }
   await expect(page.getByRole('link', { name: /무한회독 챌린지/ })).toHaveCount(0)
   const manifestResponse = await request.get(new URL('book/manifest.json', baseURL).href)
   expect(manifestResponse.ok()).toBe(true)

@@ -7,7 +7,7 @@ import { db } from '../storage/db'
 import { unifyReviews } from '../storage/reviews'
 import { TeacherButton } from '../ui/TeacherButton'
 import { ReleaseBanner } from './ReleaseBanner'
-import { stages } from './stages'
+import { StageCards } from './StageCards'
 
 export function Home({ book }: { book: BookIndex }) {
   const answered = useLiveQuery(() => db.attempts.orderBy('no').uniqueKeys(), [], [])
@@ -46,23 +46,7 @@ export function Home({ book }: { book: BookIndex }) {
       </section>
     </div>
 
-    <section className="home-section" aria-labelledby="levels-title">
-      <div className="section-heading"><h2 id="levels-title">단계별 학습</h2></div>
-      <div className={publicPreview ? "stage-grid preview-stage-grid" : "stage-grid"}>
-        {stages.filter(({ number }) => isStageOpen(number)).map((stage) => {
-          const total = book.stages.find((item) => item.stage === stage.number)?.parts.reduce((sum, part) => sum + part.count, 0) ?? 0
-          return <article className={'stage-card ' + stage.color} key={stage.number}>
-            <Link className="stage-link" to={'/stage/' + stage.number}>
-              <span className="tag">{stage.number}단계</span>
-              <h3>{stage.name}</h3>
-              <p>{stage.label}</p>
-              <span className="stage-count">{total.toLocaleString('ko-KR')}문항 <ChevronRight size={16} /></span>
-            </Link>
-            <div className="teacher-orb"><TeacherButton stage={stage.number} /></div>
-          </article>
-        })}
-      </div>
-    </section>
+    <StageCards book={book} />
 
     <section className="home-section" aria-labelledby="practice-title">
       <div className="section-heading"><h2 id="practice-title">실전과 복습</h2></div>

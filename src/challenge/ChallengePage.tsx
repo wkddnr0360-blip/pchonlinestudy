@@ -3,6 +3,7 @@ import type { BookIndex, Stage } from '../book/types'
 import { getQuestions } from '../book/catalog'
 import { storeBestScore } from '../storage/challenge'
 import type { ChallengeScore } from '../storage/db'
+import { createRecordId } from '../storage/recordId'
 import { ChallengeResult } from './ChallengeResult'
 import { ChallengeRun, type Session } from './ChallengeRun'
 import { ChallengeSetup } from './ChallengeSetup'
@@ -48,7 +49,7 @@ export default function ChallengePage({ book }: { book: BookIndex }) {
       const first = draw(1)
       if (!first) throw new Error('선택한 범위에 출제할 문제가 없어요.')
       const label = challengeScopes(book).find((item) => item.key === scope)?.label ?? '전범위'
-      setSession({ id: crypto.randomUUID(), scope, label, draw, first })
+      setSession({ id: createRecordId(), scope, label, draw, first })
       window.scrollTo(0, 0)
     } catch (failure) {
       music.stop()

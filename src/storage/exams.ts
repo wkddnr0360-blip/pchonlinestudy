@@ -1,6 +1,7 @@
 import { isExamOpen } from '../book/publicPreview'
 import { correctOption, type ExamQuestion } from '../exam/generate'
 import { db, type ExamSession, type ReviewItem } from './db'
+import { createRecordId } from './recordId'
 import { makeOxReview } from './reviews'
 
 export async function activeExam() {
@@ -12,7 +13,7 @@ export async function startExam(questions: ExamQuestion[], minutes: number, vers
     const existing = await activeExam()
     if (existing) return existing
     const exam: ExamSession = {
-      id: crypto.randomUUID(), version, status: 'active', questions,
+      id: createRecordId(), version, status: 'active', questions,
       responses: questions.map(() => null), position: 0, startedAt: now, deadline: now + minutes * 60000,
     }
     await db.exams.add(exam)

@@ -16,6 +16,7 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@noble/hashes": "^2.4.0",
     "dexie": "^4.2.1",
     "dexie-react-hooks": "^4.2.0",
     "lucide-react": "^0.577.0",

@@ -10,7 +10,7 @@
 .stage-link { display: block; min-height: inherit; padding: 18px 14px 18px 20px; outline-offset: -4px; }
 .stage-link:focus-visible { border-radius: 22px; }
 .stage-link:focus-visible .stage-count, .stage-link:hover .stage-count { text-decoration: underline; text-underline-offset: 4px; }
-.stage-link p { line-height: 1.5; word-break: keep-all; }
+.stage-description { line-height: 1.5; word-break: keep-all; }
 .teacher-control {
   appearance: none; position: relative; display: block; padding: 0; width: calc(var(--sprite, 140px) * .58);
   height: var(--sprite, 140px); border: 0; border-radius: 17px; background: transparent; isolation: isolate; pointer-events: auto;
@@ -18,7 +18,7 @@
 .teacher-control.hero-teacher, .teacher-control.banner-teacher { position: absolute; }
 .teacher-control.hero-teacher { z-index: 3; }
 .teacher-control .teacher { position: absolute; top: 0; left: 50%; margin-left: calc(var(--sprite, 140px) * -.5); }
-.teacher-reacting { background-image: url('/characters/teacher-reactions.webp'); }
+.teacher-reaction-pose { background-image: url('/characters/teacher-reactions.webp'); }
 .teacher-reacting.teacher-1 { animation: ons-laugh 850ms steps(3, end) both; }
 .teacher-reacting.teacher-2 { animation: ons-delight 1.05s steps(4, end) both; }
 .teacher-reacting.teacher-3 { animation: ons-fire-up 900ms steps(4, end) both; }
@@ -111,7 +111,7 @@
   .release-notice .button { min-height: 40px; }
   .hero-content { max-width: 76%; }
   .hero-content p { max-width: 92%; word-break: keep-all; }
-  .stage-card .stage-link p { max-width: 68%; }
+  .stage-card .stage-description { max-width: 68%; }
   .stage-banner p { max-width: min(205px, 66vw); word-break: keep-all; }
   .sound-select select { font-size: 16px; }
 }
