@@ -41,7 +41,7 @@ jobs:
       - run: npm run verify:book
       - run: npm run test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - name: Build and verify temporary public preview
         if: env.PAGES_PREVIEW == '1'
@@ -49,7 +49,7 @@ jobs:
           VITE_PUBLIC_PREVIEW: "1"
         run: |
           npm run build
-          npm run test:e2e -- tests/public-preview.e2e.ts
+          npm run test:e2e -- tests/public-preview.e2e.ts tests/startup.e2e.ts
       - uses: actions/upload-pages-artifact@v4
         if: github.event_name != 'pull_request'
         with:

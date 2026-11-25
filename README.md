@@ -30,7 +30,7 @@ python3 scripts/verify_book.py --source /path/to/original.hwpx
 npm run verify:book
 npm test
 npm run build
-npx playwright install chromium
+npx playwright install chromium webkit
 npm run test:e2e
 ```
 

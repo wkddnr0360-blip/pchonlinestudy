@@ -22,6 +22,14 @@ export default defineConfig({
         launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE },
       },
     },
+    {
+      name: 'iphone',
+      testMatch: '**/startup.e2e.ts',
+      use: {
+        ...devices['iPhone 13'],
+        launchOptions: { executablePath: process.env.PLAYWRIGHT_WEBKIT_EXECUTABLE },
+      },
+    },
   ],
   webServer: {
     command: 'npm run preview -- --port 4173 --strictPort',

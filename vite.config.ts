@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir, rm, unlink, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -10,6 +10,7 @@ const base = process.env.PAGES_BASE ?? '/'
 const publicPreview = process.env.VITE_PUBLIC_PREVIEW === '1'
 const release = { id: randomUUID(), builtAt: Date.now() }
 const workerFile = 'sw-' + release.id + '.js'
+const legacyEntries = ['assets/index-C_VShATN.js', 'assets/index-DFWwxs5v.js']
 let outputDirectory: string
 
 export default defineConfig({
@@ -19,8 +20,27 @@ export default defineConfig({
     {
       name: 'ons-release',
       apply: 'build',
-      generateBundle() {
+      generateBundle(_options, bundle) {
         this.emitFile({ type: 'asset', fileName: 'release.json', source: JSON.stringify(release) })
+
+        const entry = Object.values(bundle).find((file) => file.type === 'chunk' && file.isEntry)
+        if (!entry || entry.type !== 'chunk') throw new Error('App entry script is missing.')
+
+        // Cached Pages HTML can still point to either previously published entry script.
+        const styles = [...(entry.viteMetadata?.importedCss ?? [])].map((file) => base + file)
+        const bridge = `import ${JSON.stringify('./' + basename(entry.fileName))};
+const currentStyles = Array.from(document.querySelectorAll('link[rel="stylesheet"]'));
+for (const href of ${JSON.stringify(styles)}) {
+  if (currentStyles.some((link) => link.href === new URL(href, location.href).href)) continue;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.append(link);
+}
+`
+        for (const fileName of legacyEntries) {
+          if (fileName !== entry.fileName) this.emitFile({ type: 'asset', fileName, source: bridge })
+        }
       },
     },
     {
@@ -70,6 +90,7 @@ export default defineConfig({
         cleanupOutdatedCaches: false,
         globPatterns: ['**/*.{html,js,css,svg,png,webp,woff2}', 'book/manifest.json'],
         navigateFallback: base + 'index.html',
+        navigateFallbackDenylist: [/[?&]ons-retry=/],
         runtimeCaching: [
           ...(publicPreview ? [{
             urlPattern: ({ url, sameOrigin }: { url: URL; sameOrigin: boolean }) =>

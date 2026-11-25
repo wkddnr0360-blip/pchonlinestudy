@@ -12,7 +12,32 @@
     <title>박철한 온스</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main style="max-width: 30rem; margin: 15vh auto 0; padding: 1.5rem; font: 1rem/1.6 system-ui, sans-serif">
+        <h1>박철한 온스</h1>
+        <p id="ons-start-status" role="status">학습 화면을 불러오는 중입니다.</p>
+        <a id="ons-start-retry" href="%BASE_URL%?ons-retry=1" style="text-decoration: underline" hidden>다시 불러오기</a>
+        <noscript><p>브라우저에서 자바스크립트를 켜면 학습 화면을 열 수 있어요.</p></noscript>
+      </main>
+    </div>
+    <script>
+      (() => {
+        const status = document.getElementById('ons-start-status');
+        const retry = document.getElementById('ons-start-retry');
+        function showRetry() {
+          if (!status.isConnected) return;
+          status.textContent = '학습 화면을 불러오지 못했어요.';
+          const url = new URL(location.href);
+          url.searchParams.set('ons-retry', String(Date.now()));
+          retry.href = url.href;
+          retry.hidden = false;
+        }
+        window.addEventListener('error', (event) => {
+          if (event.target?.tagName === 'SCRIPT' || event.error) showRetry();
+        }, true);
+        window.setTimeout(showRetry, 12000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
