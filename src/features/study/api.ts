@@ -21,7 +21,6 @@ export function studyError(error: unknown) {
     if (error.status === 429) return '요청이 많습니다. 잠시 뒤 다시 시도해 주세요.'
     if (error.code === 'account_suspended') return '이 계정은 현재 학습할 수 없습니다.'
     if (error.code === 'stale_question') return '문제가 갱신되었습니다. 같은 번호를 다시 열어 주세요.'
-    if (error.code === 'import_account_changed') return '로그인 계정이 바뀌었습니다. 새로고침한 뒤 받는 계정을 확인해 주세요.'
     if (error.status === 404) return '이 문제는 현재 계정에서 열 수 없습니다.'
   }
   return '요청을 완료하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.'

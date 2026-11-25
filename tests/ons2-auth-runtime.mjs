@@ -88,7 +88,7 @@ before(async () => {
 after(async () => { await harness.close() })
 beforeEach(async () => { await env.DB.prepare('DELETE FROM auth_rate_limits').run() })
 
-test('private OX projects one prompt, grades on D1 and imports progress only to the confirmed account', async () => {
+test('private OX grades on D1 and reads stored progress after removal of imports', async () => {
   assert.equal((await api('/study/questions/1')).status, 401)
   const password = 'Synthetic study fixture 26!'
   const email = 'study@example.test'
@@ -125,11 +125,12 @@ test('private OX projects one prompt, grades on D1 and imports progress only to 
   assert.deepEqual(await (await api('/study/review', { cookie })).json(), { questions: [{ no: 1, stage: 1 }], next: null })
 
   const at = Date.now() - 60_000
-  const attempts = [{ eventId: 'legacy-session:1', no: 2, choice: 'O', at }, { eventId: 'legacy-session:25', no: 25, choice: 'X', at }]
-  assert.equal((await api('/study/import', { cookie, body: { accountId: 'other-account', attempts } })).status, 409)
-  const importBody = { accountId: user.id, attempts }
-  assert.deepEqual(await (await api('/study/import', { cookie, body: importBody })).json(), { imported: 1, skipped: 1 })
-  assert.deepEqual(await (await api('/study/import', { cookie, body: importBody })).json(), { imported: 0, skipped: 2 })
+  await env.DB.prepare(`INSERT INTO study_attempts (user_id, event_id, kind, no, choice, occurred_at, received_at)
+    VALUES (?, 'legacy-session:1', 'legacy', 2, 'O', ?, ?)`).bind(user.id, at, at).run()
+  const removedImport = await api('/study/import', { cookie, body: {
+    accountId: user.id, attempts: [{ eventId: 'legacy-session:2', no: 3, choice: 'X', at }],
+  } })
+  assert.equal(removedImport.status, 404)
   assert.deepEqual(await (await api('/study/progress', { cookie })).json(), { progress: { attempted: 1, imported: 1, lastNo: 1 } })
   const { count } = await env.DB.prepare('SELECT COUNT(*) AS count FROM study_attempts WHERE user_id = ?').bind(user.id).first()
   assert.equal(count, 2)

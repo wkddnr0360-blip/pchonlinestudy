@@ -18,7 +18,7 @@
 ## 실행 순서
 - P0-A: baseline 테스트와 위험 분석, 저장소 정리/비공개 운영 계획, 환경별 Worker/D1/KV, synthetic fixtures. 권리자/소유자 승인 없이는 실자료 공개 및 운영 전환 금지.
 - P0-B: migrations, auth/이메일/Google, 보안 세션, 구매 신청/코드/entitlement, 관리자 UI.
-- P0-C: 문제·채점·모의고사 API, 진도 이관, PWA, 문제 수정 MCP 및 감사, 실제 연동.
+- P0-C: 문제·채점·모의고사 API, 계정 진도 저장, PWA, 문제 수정 MCP 및 감사, 실제 연동.
 - P1-A: 디자인 토큰 및 반응형 UX, 상태별 UI, Storybook/Playwright visual/axe.
 - P1-B: 무료/인증 탑 일반모드 및 Gold gate, 도전모드, 서버 점수·순위, 14일 시즌, 관리자·MCP 시즌/분포 검증.
 - P1-C: 원본 대비 5티어 실제 픽셀 정지 시트 + climb 루프 먼저 승인, Phaser 모션과 타일맵, 모바일 실측 후 확장.

@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AccountArtwork } from './AccountArtwork'
 import { TicketArt } from './TicketArt'
 import { PurchaseForm } from './PurchaseForm'
-import { LegacyImport } from '../study/LegacyImport'
 import { studyReturnFromQuery } from '../study/navigation'
 import googleMark from './google-g.png'
 import './account.css'
@@ -227,7 +226,6 @@ export function AccountPage() {
               )}
               {studyTarget && (account.access.bookVerified || ['1', 'review'].includes(studyTarget.key)) &&
                 <a href={studyTarget.href} className="ons-account-continue">학습으로 돌아가기<ArrowRight size={17} aria-hidden="true" /></a>}
-              {account.user.id && <LegacyImport key={account.user.id} account={account.user} />}
               {account.admin && <a href="/admin" className="ons-admin-link"><ShieldCheck size={17} aria-hidden="true" />관리자 페이지</a>}
               <button type="button" className="ons-text-button ons-sign-out" disabled={busy} onClick={() => void run(async () => {
                 if (!(await post('/auth/sign-out', {})).ok) throw new Error('Sign-out failed')

@@ -33,16 +33,6 @@
 }
 
 .ons-account-continue { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; min-height: 2.75rem; padding: 0 0.65rem; color: var(--ons-blue-hover); background: var(--ons-selection); border-radius: 0.7rem; font-weight: 800; text-decoration: none; }
-.ons-legacy-import { padding: 0.65rem 0.75rem; border: 1px solid var(--ons-rule); border-radius: 0.8rem; }
-.ons-legacy-import summary { min-height: 2.75rem; cursor: pointer; font-weight: 800; }
-.ons-legacy-import summary svg { vertical-align: -0.25em; margin-inline: 0.22rem 0.35rem; color: var(--ons-blue-hover); }
-.ons-legacy-import p { margin-block: 0.45rem; font-size: 0.86rem; color: var(--ons-secondary); overflow-wrap: anywhere; }
-.ons-legacy-import p:empty { display: none; }
-.ons-legacy-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
-.ons-legacy-action { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 2.75rem; box-sizing: border-box; padding: 0.3rem 0.55rem; border: 1px solid var(--ons-rule); border-radius: 0.65rem; background: var(--ons-surface); color: var(--ons-blue-hover); font-size: 0.82rem; font-weight: 800; cursor: pointer; }
-.ons-legacy-file { position: relative; }
-.ons-legacy-file:focus-within { outline: 3px solid var(--ons-blue); outline-offset: 2px; }
-.ons-legacy-file input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
 
 .ons-account-art-3 {
   --art-top: #faf2df;

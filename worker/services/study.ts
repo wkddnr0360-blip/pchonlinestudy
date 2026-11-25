@@ -1,5 +1,5 @@
 import type { ExplanationBlock, Ox, Stage } from '../../src/book/types'
-import { questionId, type LegacyAttempt, type StudyIndexEntry, type StudyOutlineLabel, type StudyProgress, type StudyQuestion, type StudyResult } from '../../shared/study'
+import { questionId, type StudyIndexEntry, type StudyOutlineLabel, type StudyProgress, type StudyQuestion, type StudyResult } from '../../shared/study'
 import { captureStudyAttempt } from '../analytics/capture'
 
 export type StageLimit = 1 | 3
@@ -97,14 +97,4 @@ export async function studyReview(db: D1Database, userId: string, maxStage: Stag
   `).bind(maxStage, beforeNo, userId).all<{ no: number; stage: Stage }>()
   const questions = results.slice(0, 50)
   return { questions, next: results.length > 50 ? questions[49].no : null }
-}
-
-export async function importLegacyAttempts(db: D1Database, userId: string, maxStage: StageLimit, attempts: LegacyAttempt[], now: number) {
-  const result = await db.batch(attempts.map(({ eventId, no, choice, at }) => db.prepare(`
-    INSERT INTO study_attempts (user_id, event_id, kind, no, choice, occurred_at, received_at)
-    SELECT ?, ?, 'legacy', no, ?, ?, ? FROM book_questions WHERE no = ? AND stage <= ?
-    ON CONFLICT(user_id, kind, event_id) DO NOTHING RETURNING event_id
-  `).bind(userId, eventId, choice, at, now, no, maxStage)))
-  const imported = result.reduce((sum, row) => sum + row.results.length, 0)
-  return { imported, skipped: attempts.length - imported }
 }

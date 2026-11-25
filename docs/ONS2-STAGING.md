@@ -28,11 +28,11 @@ npm run dev:ons2
 
 2026-11-26에 Wrangler 계정 연결 및 Codex의 공식 Cloudflare MCP OAuth를 확인했다. `pch-ons2-staging` D1과 `pch-ons2-mcp-staging` KV를 별도로 생성했다. 로컬의 두 스테이징 Wrangler 설정에는 리소스 ID를 넣었으며 Git에서 제외한다. 구매 인증은 앱 D1을 사용하고 공개 정적 파일은 Workers Static Assets가 제공한다. [Cloudflare Codex 설정](https://developers.cloudflare.com/agent-setup/prompt.md)
 
-앱의 첫 스테이징은 [온스 2.0 스테이징](https://pch-ons2-staging.wkddnr0360.workers.dev/)에 배포했다. 앱의 비공개 API는 세션을 요구하고 공개 화면은 검색 로봇 색인 대상에서 제외했다. 현재 D1에 질문·회원·사진은 0건이다. 앱 전용 세션 키를 설치했으며 Google OAuth와 발신 메일 설정은 대기 중이다. Google에 등록할 스테이징 콜백 주소는 `https://pch-ons2-staging.wkddnr0360.workers.dev/api/v1/auth/callback/google`다.
+앱의 첫 스테이징은 [온스 2.0 스테이징](https://pch-ons2-staging.wkddnr0360.workers.dev/)에 배포했다. 앱의 비공개 API는 세션을 요구하고 공개 화면은 검색 로봇 색인 대상에서 제외했다. 첫 배포 시 D1의 질문·회원·사진은 0건이었다. 스테이징 Worker의 세션 키와 Google OAuth 키가 설정되어 있다. Google Cloud `pchoxstudy` 프로젝트의 `ONS 2.0 Staging` 웹 클라이언트에 `https://pch-ons2-staging.wkddnr0360.workers.dev/api/v1/auth/callback/google`을 등록했다. 발신 메일은 Resend 계정 로그인과 발신 도메인 검증을 기다리고 있다.
 
 1. 권리자의 교재 변환·서비스 제공 및 아트 사용 허락을 확인한다. 권한이 있는 비공개 개발 저장소와 합성 자료 전용 스테이징을 준비하고 운영 프로젝트와 분리한다.
 2. Cloudflare 계정에서 스테이징 D1 데이터베이스와 MCP 전용 KV를 만든다. 두 `cloudflare/wrangler.*staging.example.jsonc` 템플릿을 같은 디렉터리에 복사하고 파일명에서 `.example`을 뺀 뒤 스테이징 계정·리소스 값을 채운다. 템플릿의 `workers_dev` 및 `preview_urls`는 기본 비활성이다. 접근 제한을 설정한 별도 스테이징 호스트명을 사용한다. [Wrangler 설정](https://developers.cloudflare.com/workers/wrangler/configuration/)
-3. `APP_ORIGIN`에 스테이징의 HTTPS 원점을 입력한다. Google Cloud에서 테스트용 OAuth 웹 클라이언트를 만들고 `https://<스테이징 호스트>/api/v1/auth/callback/google`을 승인된 리디렉션 URI로 등록한다. 테스트 사용자도 추가한다. 이메일 인증과 재설정에 사용할 발신 도메인은 Resend에서 검증한다. 앱 Worker에 `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `MAIL_FROM`을 각각 `npx wrangler secret put <이름> --config cloudflare/wrangler.staging.jsonc`로 등록한다. [Google 웹 서버 OAuth](https://developers.google.com/identity/protocols/oauth2/web-server) · [Resend 이메일 API](https://resend.com/docs/api-reference/emails/send-email) · [Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
+3. `APP_ORIGIN`에 스테이징의 HTTPS 원점을 입력한다. Google Cloud에서 테스트용 OAuth 웹 클라이언트를 만들고 `https://<스테이징 호스트>/api/v1/auth/callback/google`을 승인된 리디렉션 URI로 등록한다. 현재 로그인에 요청하는 `openid`, `email`, `profile`만 사용하면 Google 테스트 사용자 등록은 생략할 수 있다. 이메일 인증과 재설정에 사용할 발신 도메인은 Resend에서 검증한다. 앱 Worker에 `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `MAIL_FROM`을 각각 `npx wrangler secret put <이름> --config cloudflare/wrangler.staging.jsonc`로 등록한다. [Google OAuth 게시 상태](https://support.google.com/cloud/answer/15549945) · [Resend 발신 도메인](https://resend.com/docs/dashboard/domains/introduction) · [Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
 4. 배포 전에 `npm run build:ons2`로 정적 파일 검사까지 실행하고, 스테이징 리소스 이름과 바인딩을 대조한다. 스테이징이 활성화되면 마이그레이션을 적용하고 Cloudflare Access 등에서 허용한 테스트 계정으로 Google 콜백, Resend 발송, 권한 회수, 만료, 직접 경로, 캐시를 확인한다. 결과는 DEVLOG에 기록한다. 운영 도메인과 Pages 이전은 별도 승인 뒤 진행한다.
 
 ## 기존 교재 노출 대응
@@ -42,7 +42,7 @@ npm run dev:ons2
 
 ## 같은 주소에서 서비스 워커 전환
 
-승인된 Workers 이관 때 기존 Pages와 동일한 HTTPS 주소의 루트에서 `LEGACY_PAGES_CACHE_MIGRATION=1`을 사용한다. 이전 앱은 갱신 표시를 통해 새 Worker를 설치하고, 진행 중인 학습·모의고사를 마친 뒤 사용자가 적용할 수 있다. 이미 있던 `?ons-retry=1` 경로로 캐시를 거치지 않고 새 화면을 여는 방법도 제공한다. 전환 Worker는 과거 온스 셸·교재 캐시만 지운다. IndexedDB 학습 기록과 계정 연동은 별도 P0-C 이관 범위다.
+승인된 Workers 이관 때 기존 Pages와 동일한 HTTPS 주소의 루트에서 `LEGACY_PAGES_CACHE_MIGRATION=1`을 사용한다. 이전 앱은 갱신 표시를 통해 새 Worker를 설치하고, 진행 중인 학습·모의고사를 마친 뒤 사용자가 적용할 수 있다. 이미 있던 `?ons-retry=1` 경로로 캐시를 거치지 않고 새 화면을 여는 방법도 제공한다. 전환 Worker는 과거 온스 셸·교재 캐시만 지운다.
 
 ## 공개 정적 파일 캐시
 
@@ -72,7 +72,7 @@ npx wrangler d1 execute DB --local --file .ons2/private/normalized-book.sql --co
 
 부여된 권한으로 실제 전체 교재를 사용할 수 있는 환경에서 목차명, 문항 수, 기출 출처를 대조한 뒤 운영 적용을 검토한다. 2026-11-26 외부 스테이징 D1에 목차·모의고사 마이그레이션을 적용하고 미적용 마이그레이션이 없음을 확인했다. 실제 교재 적재와 앱 로그인 연동은 대기 중이다.
 
-`/study`에서 허용된 단계와 번호 범위, 답 제출 후 해설 표시, 오답 재풀이를 확인한다. 기존 OX 기록은 동일 주소의 브라우저 또는 온스 JSON 백업에서 선택하고, 이메일이 표시된 수신 계정으로 이관을 확정한다. 서버는 문제 번호, 사용자 답, 시각, 중복 식별자를 수신한다. 기존 시험 내용과 저장된 채점값은 브라우저에서 이관 요청에 포함하지 않는다. 기존 시험 및 오답 해소 상태는 후속 이관 범위다.
+`/study`에서 허용된 단계와 번호 범위, 답 제출 후 해설 표시, 오답 재풀이를 확인한다. 계정 화면의 기존 OX 진도 가져오기 경로는 종료했다. D1에 이미 저장된 가져오기 기록은 기존 진도 응답에 포함한다.
 
 ## 기본 OX 문항 분석
 

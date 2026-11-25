@@ -49,16 +49,6 @@ export interface StudyProgress {
   lastNo: number | null
 }
 
-export interface LegacyAttempt {
-  eventId: string
-  no: number
-  choice: Ox
-  at: number
-}
-
-export const legacyBatchSize = 50
-export const legacyEventId = /^[a-zA-Z0-9:_-]{1,100}$/
-
 export function questionId(no: number) {
   return `pch-ox-${no}`
 }

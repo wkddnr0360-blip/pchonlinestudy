@@ -41,7 +41,7 @@ beforeEach(async () => {
   await env.DB.prepare('DELETE FROM auth_rate_limits').run()
 })
 
-test('a mobile learner solves one printed number and moves only allowlisted legacy fields', async () => {
+test('a mobile learner signs up, solves an OX question and opens the verified exam', async () => {
   const page = await browser.newPage({ viewport: { width: 320, height: 850 } })
   try {
     const email = 'study-browser@example.test'
@@ -101,20 +101,9 @@ test('a mobile learner solves one printed number and moves only allowlisted lega
     await page.getByRole('link', { name: '오답노트', exact: true }).click()
     await expect(page.getByRole('button', { name: '1단계 교재 2번' })).toBeVisible()
     await page.getByRole('link', { name: '내 계정', exact: true }).click()
-    await page.getByText('기존 OX 진도 가져오기', { exact: true }).click()
-    const at = Date.now() - 60_000
-    const attempts = [{ id: 'synthetic-session:1', no: 1, answer: 'X', at, correct: true }]
-    const backup = { format: 'police-constitution-ox', schemaVersion: 1, attempts, exams: [{ prompt: 'synthetic private prompt sentinel' }] }
-    await page.getByLabel('온스 백업 JSON 선택').setInputFiles({ name: 'fixture.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) })
     await expect(page.getByText(email, { exact: true })).toBeVisible()
-    const request = page.waitForRequest((item) => item.url().endsWith('/api/v1/study/import'))
-    await page.getByRole('button', { name: '이 계정으로 가져오기' }).click()
-    const sent = (await request).postDataJSON()
-    assert.deepEqual(sent.attempts, [{ eventId: 'synthetic-session:1', no: 1, choice: 'X', at }])
-    assert.deepEqual(Object.keys(sent).sort(), ['accountId', 'attempts'])
-    await expect(page.getByText('기존 OX 기록 1개를 가져왔습니다.')).toBeVisible()
+    await expect(page.getByText('기존 OX 진도 가져오기', { exact: true })).toHaveCount(0)
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
-    await page.screenshot({ path: '.ons2/qa/legacy-import-320.png', fullPage: true, animations: 'disabled' })
 
     const user = (await (await page.request.get(baseURL + '/api/v1/session')).json()).user
     const requestId = randomUUID()
@@ -143,7 +132,7 @@ test('a mobile learner solves one printed number and moves only allowlisted lega
   } finally { await page.close() }
 })
 
-for (const width of [320, 390, 768, 1080, 1280]) {
+for (const width of [320, 390, 701, 768, 1080, 1280]) {
   test(`account navigation and keyboard focus at ${width}px`, async () => {
     const page = await browser.newPage({ viewport: { width, height: 800 } })
     try {
@@ -157,6 +146,13 @@ for (const width of [320, 390, 768, 1080, 1280]) {
           Math.round(card.querySelector(selector).getBoundingClientRect().top - top))
       }))
       assert.deepEqual(positions, [positions[0], positions[0], positions[0]])
+      const descriptionGaps = await page.locator('.ons-stage-card').evaluateAll((cards) => cards.map((card) => {
+        const description = document.createRange()
+        description.selectNodeContents(card.querySelector('.ons-stage-card-description'))
+        const textRight = Math.max(...Array.from(description.getClientRects(), (line) => line.right))
+        return card.querySelector('.ons-stage-scene').getBoundingClientRect().left - textRight
+      }))
+      assert.ok(descriptionGaps.every((gap) => gap >= 8), `Description to artwork gaps: ${descriptionGaps.join(', ')}`)
       if ([390, 1080, 1280].includes(width)) {
         await page.screenshot({ path: `.ons2/qa/home-${width}.png`, animations: 'disabled', fullPage: width === 1280 })
       }

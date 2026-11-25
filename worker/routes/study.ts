@@ -1,10 +1,10 @@
-import { legacyBatchSize, legacyEventId, type LegacyAttempt, type StudyResult } from '../../shared/study'
+import type { StudyResult } from '../../shared/study'
 import type { AppEnv } from '../index'
 import { issueStatisticsContext, statisticsTiming } from '../analytics/context'
 import { readStudyStatistics, recommendCommonMistakes, recommendStudyQuestions } from '../analytics/read'
 import { json, readSmallJson } from '../http'
 import { readMemberAccess } from '../services/book-access'
-import { gradeStudyAnswer, importLegacyAttempts, readStudyQuestion, studyCatalog, studyProgress, studyReview, withinStudyLimit } from '../services/study'
+import { gradeStudyAnswer, readStudyQuestion, studyCatalog, studyProgress, studyReview, withinStudyLimit } from '../services/study'
 
 export const studyPrefix = '/api/v1/study/'
 const eventIdPattern = /^[a-zA-Z0-9_-]{1,100}$/
@@ -15,12 +15,6 @@ function positiveInteger(value: unknown): value is number {
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-}
-
-function legacyAttempt(value: unknown, now: number): value is LegacyAttempt {
-  const { eventId, no, choice, at } = record(value)
-  return typeof eventId === 'string' && legacyEventId.test(eventId) && positiveInteger(no)
-    && (choice === 'O' || choice === 'X') && positiveInteger(at) && at <= now
 }
 
 export async function studyRoute(request: Request, env: AppEnv, url: URL, userId: string) {
@@ -77,14 +71,6 @@ export async function studyRoute(request: Request, env: AppEnv, url: URL, userId
       result.statistics = await readStudyStatistics(db, userId, no, grade.statisticsVersion).catch(() => undefined)
     }
     return json({ result }, 200)
-  }
-  if (method === 'POST' && path === 'import') {
-    const { accountId, attempts } = record(await readSmallJson(request, 16_384))
-    if (accountId !== userId) return json({ error: 'import_account_changed' }, 409)
-    if (!Array.isArray(attempts) || attempts.length < 1 || attempts.length > legacyBatchSize
-      || !attempts.every((value) => legacyAttempt(value, now))) return json({ error: 'invalid_input' }, 400)
-    if (!await withinStudyLimit(db, userId, 'import', now, 48)) return json({ error: 'rate_limited' }, 429)
-    return json(await importLegacyAttempts(db, userId, maxStage, attempts, now), 200)
   }
   return json({ error: 'not_found' }, 404, method)
 }
