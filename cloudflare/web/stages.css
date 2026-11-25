@@ -9,7 +9,7 @@
 .ons-stage-card-copy { display: grid; width: min(100%, 13rem); position: relative; z-index: 1; justify-items: start; gap: 0.28rem; }
 .ons-stage-no { display: inline-flex; padding: 0.22rem 0.57rem; border-radius: 0.48rem; color: var(--stage-ink); background: var(--stage-chip); font-weight: 860; font-size: 0.79rem; }
 .ons-stage-card-copy strong { display: block; font-size: clamp(1.18rem, 2.7vw, 1.78rem); line-height: 1.2; letter-spacing: -0.046em; font-weight: 900; }
-.ons-stage-card-description { max-width: 10.8rem; color: var(--ons-secondary); font-size: clamp(0.75rem, 1.7vw, 0.89rem); line-height: 1.35; }
+.ons-stage-card-description { max-width: 10.8rem; min-block-size: 2.7em; color: var(--ons-secondary); font-size: clamp(0.75rem, 1.7vw, 0.89rem); line-height: 1.35; }
 .ons-stage-status { font-size: 0.81rem; font-weight: 850; color: var(--stage-ink); }
 .ons-stage-card-icon { position: absolute; z-index: 2; inset: auto 0.7rem 0.65rem auto; display: grid; place-items: center; width: 2rem; aspect-ratio: 1; color: var(--stage-ink); background: #ffffffdc; border-radius: 50%; }
 .ons-stage-card .ons-stage-card-art { position: absolute; inset: 0 0 0 auto; width: 52%; max-width: 12rem; }

@@ -32,7 +32,7 @@ export function authSettings(env: AppEnv) {
 
 type AuthSettings = NonNullable<ReturnType<typeof authSettings>>
 
-async function sendAccountEmail(env: AppEnv, settings: AuthSettings, kind: 'verify' | 'reset', email: string, url: string) {
+async function sendAccountEmail(env: AppEnv, settings: AuthSettings, kind: 'verify' | 'reset', email: string, url: string, onLocalMail?: (url: string) => void) {
   if (settings.testMail) {
     if (!email.endsWith('@example.test')) throw new Error('Synthetic email address required')
     await env.DB.batch([
@@ -40,6 +40,7 @@ async function sendAccountEmail(env: AppEnv, settings: AuthSettings, kind: 'veri
       env.DB.prepare('INSERT INTO local_mail_fixtures (kind, email, url) VALUES (?, ?, ?) ON CONFLICT (kind, email) DO UPDATE SET url = excluded.url')
         .bind(kind, email, url),
     ])
+    onLocalMail?.(url)
     return
   }
 
@@ -53,7 +54,7 @@ async function sendAccountEmail(env: AppEnv, settings: AuthSettings, kind: 'veri
   if (!response.ok) throw new Error('Could not send account email')
 }
 
-export function createAuth(env: AppEnv, settings: AuthSettings) {
+export function createAuth(env: AppEnv, settings: AuthSettings, onLocalMail?: (url: string) => void) {
   return betterAuth({
     appName: '박철한 온스',
     database: env.DB,
@@ -80,14 +81,14 @@ export function createAuth(env: AppEnv, settings: AuthSettings) {
       minPasswordLength: 12,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async ({ user, url }) => sendAccountEmail(env, settings, 'reset', user.email, url),
+      sendResetPassword: async ({ user, url }) => sendAccountEmail(env, settings, 'reset', user.email, url, onLocalMail),
     },
     emailVerification: {
       sendOnSignUp: true,
       sendOnSignIn: false,
       autoSignInAfterVerification: false,
       expiresIn: 60 * 30,
-      sendVerificationEmail: async ({ user, url }) => sendAccountEmail(env, settings, 'verify', user.email, url),
+      sendVerificationEmail: async ({ user, url }) => sendAccountEmail(env, settings, 'verify', user.email, url, onLocalMail),
     },
     rateLimit: {
       enabled: true,

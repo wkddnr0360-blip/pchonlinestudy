@@ -9,7 +9,10 @@ const harness = createTestHarness({
   ],
 })
 
-before(async () => { await harness.listen() })
+before(async () => {
+  await harness.listen()
+  await harness.getWorker('pch-ons2-local').applyD1Migrations('DB')
+})
 after(async () => { await harness.close() })
 
 test('the shell and its scripts load through the Worker', async () => {
@@ -40,7 +43,7 @@ test('legacy files, private objects and unknown API paths cannot fall through to
     assert.equal(response.headers.get('Cache-Control'), 'private, no-store', path)
     assert.deepEqual(await response.json(), { error: 'not_found' }, path)
   }
-  const response = await harness.fetch('/api/v1/session')
+  const response = await harness.fetch('http://127.0.0.1:8787/api/v1/session')
   assert.equal(response.status, 401)
   assert.equal(response.headers.get('Cloudflare-CDN-Cache-Control'), 'no-store')
   assert.deepEqual(await response.json(), { error: 'login_required' })

@@ -7,7 +7,7 @@ npm run build:ons2
 npm run preview:ons2:design
 ```
 
-`http://127.0.0.1:8788/?preview=free`에서 3단계 홈과 무료 회원의 잠금 상태를, `http://127.0.0.1:8788/study?stage=1`에서 편·장·절 목차와 합성 OX 학습을 확인한다. `http://127.0.0.1:8788/?preview=verified`을 열면 2·3단계와 실전 모의고사를 체험할 수 있다. 로그인, 황금 티켓, 관리자도 상단 미리보기 메뉴에서 연다. 미리보기 서버는 루프백 주소에만 열리고 합성 데이터로 응답한다. 계정 연결과 외부 전송은 실제 Worker에서 검증한다.
+`http://127.0.0.1:8788/?preview=free`에서 3단계 홈과 무료 회원의 잠금 상태를, `http://127.0.0.1:8788/study?stage=1`에서 편·장·절 목차와 합성 OX 학습을 확인한다. `http://127.0.0.1:8788/?preview=verified`을 열면 2·3단계와 실전 모의고사를 체험할 수 있다. 로그인, 황금 티켓, 관리자 화면은 상단 미리보기 메뉴에서 확인한다. 디자인 미리보기는 루프백 주소에서 합성 데이터로 응답한다. 가입 및 로그인을 처리하는 로컬 Worker 주소는 `http://127.0.0.1:8787/account`다.
 
 ## 로컬 검증
 
@@ -20,7 +20,7 @@ npm run db:ons2:local
 npm run dev:ons2
 ```
 
-로컬 Worker는 `http://127.0.0.1:8787`에서 연다. `.ons2/client`는 `build:ons2`가 만들며 로컬 D1·KV는 테스트용이다. `cloudflare/.dev.vars`에 임의로 생성한 32자 이상의 `BETTER_AUTH_SECRET`과 `AUTH_EMAIL_MODE=fixtures`를 넣으면 로컬 `@example.test` 메일만 로컬 D1의 `local_mail_fixtures`에 남는다. 브라우저 검증은 `npx playwright install chromium webkit` 후 `npm run test:ons2:browser`를 실행한다. 테스트는 임시 바인딩과 합성 계정을 사용한다.
+로컬 Worker는 `http://127.0.0.1:8787`에서 연다. `.ons2/client`는 `build:ons2`가 만들며 로컬 D1·KV는 테스트용이다. `cloudflare/.dev.vars`에 임의로 생성한 32자 이상의 `BETTER_AUTH_SECRET`과 `AUTH_EMAIL_MODE=fixtures`를 넣으면 로컬 `@example.test` 메일만 로컬 D1의 `local_mail_fixtures`에 남는다. 로컬 가입 화면에서 `demo@example.test` 같은 테스트 이메일을 입력하고, 양식 제출 후 **테스트 메일 링크 열기**를 눌러 인증한다. 비밀번호 재설정도 같은 방식이다. 테스트 메일 링크는 로컬 테스트 환경에서 생성된 요청의 응답으로만 돌아온다. 브라우저 검증은 `npx playwright install chromium webkit` 후 `npm run test:ons2:browser`를 실행한다. 테스트는 임시 바인딩과 합성 계정을 사용한다.
 
 기본 단위 테스트는 모의고사, 번호 범위, 오답 배치에 필요한 합성 자료를 생성한다. 실제 원본 비교가 필요하면 권한이 확인된 HWPX에서 `scripts/import_book.py`와 `scripts/verify_book.py`를 실행한다. 기존 Pages 테스트에서 그 로컬 자료를 읽으려면 `ONS_LEGACY_BOOK=1`을 사용한다. 그 로컬 Pages 빌드와 `dist`는 운영 배포나 CI 산출물로 사용하지 않는다.
 

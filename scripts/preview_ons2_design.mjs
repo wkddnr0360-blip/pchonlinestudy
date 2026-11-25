@@ -80,7 +80,8 @@ const server = createServer(async (req, res) => {
       const learner = mode === 'verified' ? 'verified' : 'study'
       const next = path === '/admin' ? 'admin' : path === '/account' ? preview === 'ticket' ? 'ticket' : 'login'
         : preview === 'verified' ? 'verified' : preview === 'free' ? 'study' : learner
-      const localBar = `<aside style="margin:0;padding:8px 14px;background:#edf1f9;color:#25355b;font:600 13px/1.5 system-ui;display:flex;flex-wrap:wrap;gap:6px 14px"><strong>로컬 미리보기 · 합성 데이터</strong><a href="/?preview=free">무료 회원</a><a href="/?preview=verified">정회원 체험</a><a href="/account">로그인</a><a href="/account?preview=ticket">황금 티켓</a><a href="/admin">관리자</a>${next === 'ticket' ? `<span>테스트 티켓 <code>${ticketCode}</code></span>` : ''}</aside>`
+      const localAuth = next === 'login' ? '<a href="http://127.0.0.1:8787/account">로컬 회원가입·로그인 테스트</a>' : ''
+      const localBar = `<aside style="margin:0;padding:8px 14px;background:#edf1f9;color:#25355b;font:600 13px/1.5 system-ui;display:flex;flex-wrap:wrap;gap:6px 14px"><strong>로컬 미리보기 · 합성 데이터</strong><a href="/?preview=free">무료 회원</a><a href="/?preview=verified">정회원 체험</a><a href="/account">로그인 화면</a><a href="/account?preview=ticket">황금 티켓</a><a href="/admin">관리자</a>${localAuth}${next === 'ticket' ? `<span>테스트 티켓 <code>${ticketCode}</code></span>` : ''}</aside>`
       const html = (await readFile(new URL('index.html', client), 'utf8')).replace('<body>', '<body>' + localBar)
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
         'Set-Cookie': `ons-design=${next}; Path=/; HttpOnly; SameSite=Strict` }).end(html)

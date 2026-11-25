@@ -47,15 +47,19 @@ test('a mobile learner solves one printed number and moves only allowlisted lega
     const email = 'study-browser@example.test'
     const password = 'Synthetic study browser password!'
     const headers = { Origin: baseURL }
-    const created = await page.request.post(baseURL + '/api/v1/auth/sign-up/email', {
-      headers, data: { email, password, name: '합성 학습 회원', callbackURL: baseURL + '/account' },
-    })
-    assert.equal(created.status(), 200)
     const env = await harness.getWorker().getEnv()
-    const verification = await env.DB.prepare("SELECT url FROM local_mail_fixtures WHERE kind = 'verify' AND email = ?").bind(email).first('url')
-    await harness.fetch(verification, { redirect: 'manual' })
-    const authenticated = await page.request.post(baseURL + '/api/v1/auth/sign-in/email', { headers, data: { email, password } })
-    assert.equal(authenticated.status(), 200)
+    await page.goto(baseURL + '/account')
+    await page.getByRole('button', { name: '회원가입', exact: true }).click()
+    await page.getByRole('textbox', { name: '표시 이름' }).fill('합성 학습 회원')
+    await page.getByRole('textbox', { name: '이메일' }).fill(email)
+    await page.getByLabel('비밀번호', { exact: true }).fill(password)
+    await page.getByRole('button', { name: '회원가입', exact: true }).click()
+    await page.getByRole('link', { name: '테스트 메일 링크 열기' }).click()
+    await page.getByRole('heading', { name: '로그인', exact: true }).waitFor()
+    await page.getByRole('textbox', { name: '이메일' }).fill(email)
+    await page.getByLabel('비밀번호', { exact: true }).fill(password)
+    await page.getByRole('button', { name: '로그인', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '내 계정', exact: true })).toBeVisible()
 
     await page.goto(baseURL + '/study?stage=2')
     await expect(page.getByRole('link', { name: '교재 인증', exact: true })).toBeVisible()
@@ -139,15 +143,21 @@ test('a mobile learner solves one printed number and moves only allowlisted lega
   } finally { await page.close() }
 })
 
-for (const width of [320, 390, 768, 1280]) {
+for (const width of [320, 390, 768, 1080, 1280]) {
   test(`account navigation and keyboard focus at ${width}px`, async () => {
     const page = await browser.newPage({ viewport: { width, height: 800 } })
     try {
       await page.goto(baseURL)
       await page.getByRole('heading', { name: /헌법의 핵심은/ }).waitFor()
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
-      if (width === 390 || width === 1280) {
-        await page.evaluate(() => document.fonts.ready.then(() => true))
+      await page.evaluate(() => document.fonts.ready.then(() => true))
+      const positions = await page.locator('.ons-stage-card').evaluateAll((cards) => cards.map((card) => {
+        const top = card.getBoundingClientRect().top
+        return ['.ons-stage-no', '.ons-stage-card-copy strong', '.ons-stage-status'].map((selector) =>
+          Math.round(card.querySelector(selector).getBoundingClientRect().top - top))
+      }))
+      assert.deepEqual(positions, [positions[0], positions[0], positions[0]])
+      if ([390, 1080, 1280].includes(width)) {
         await page.screenshot({ path: `.ons2/qa/home-${width}.png`, animations: 'disabled', fullPage: width === 1280 })
       }
       if (width === 390) {

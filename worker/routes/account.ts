@@ -16,7 +16,7 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
   const path = url.pathname
   const settings = authSettings(env)
   if (method === 'GET' && path === '/api/v1/auth-methods') {
-    return json({ email: settings?.email ?? false, google: settings?.google ?? false }, 200)
+    return json({ email: settings?.email ?? false, google: settings?.google ?? false, ...(settings?.testMail ? { localMail: true } : {}) }, 200)
   }
   const libraryRoute = path.startsWith(authPath + '/')
   const adminRoute = path.startsWith(adminPrefix)
@@ -34,7 +34,8 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
   }
 
   try {
-    const auth = createAuth(env, settings)
+    let localMailLink: string | undefined
+    const auth = createAuth(env, settings, settings.testMail ? (link) => { localMailLink = link } : undefined)
     if (libraryRoute) {
       if (!authRoute(settings, method, path)) return json({ error: 'not_found' }, 404, method)
       let authRequest = request
@@ -64,12 +65,13 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
         headers.delete('Content-Length')
         return new Response(JSON.stringify({ totpURI }), { status: response.status, headers })
       }
-      if (response.ok && (signInRoute || path === authPath + '/sign-up/email' || path === verifyMfaPath)) {
+      if (response.ok && (signInRoute || path === authPath + '/sign-up/email' || path === verifyMfaPath || localMailLink)) {
         const result = await response.json<{ twoFactorRedirect?: boolean; token?: string }>()
         const adminMfa = path === verifyMfaPath && typeof result.token === 'string' && await recordAdminMfa(env.DB, result.token)
         headers.delete('Content-Length')
         return new Response(JSON.stringify({
           ok: true, ...(signInRoute && result.twoFactorRedirect ? { twoFactorRequired: true } : {}),
+          ...(localMailLink ? { localMailLink } : {}),
           ...(path === verifyMfaPath ? { adminMfa } : {}),
         }), { status: response.status, headers })
       }

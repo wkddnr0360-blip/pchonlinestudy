@@ -9,7 +9,7 @@ import googleMark from './google-g.png'
 import './account.css'
 
 type Mode = 'signin' | 'signup' | 'verify' | 'forgot' | 'reset'
-type Methods = { email: boolean; google: boolean }
+type Methods = { email: boolean; google: boolean; localMail?: boolean }
 type Account = {
   user: { id: string; email: string; name: string }
   access: { bookVerified: boolean; expiresAt: number | null }
@@ -61,6 +61,7 @@ export function AccountPage() {
   const [methods, setMethods] = useState<Methods | null>(null)
   const [account, setAccount] = useState<Account | null>(null)
   const [notice, setNotice] = useState('')
+  const [localMailLink, setLocalMailLink] = useState<string>()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [passwordVisible, setPasswordVisible] = useState(false)
@@ -90,6 +91,7 @@ export function AccountPage() {
   function changeMode(next: Mode) {
     setMode(next)
     setNotice('')
+    setLocalMailLink(undefined)
     setError('')
     setPasswordVisible(false)
     requestAnimationFrame(() => heading.current?.focus())
@@ -98,6 +100,7 @@ export function AccountPage() {
   async function run(action: () => Promise<void>) {
     setBusy(true)
     setNotice('')
+    setLocalMailLink(undefined)
     setError('')
     try {
       await action()
@@ -144,7 +147,9 @@ export function AccountPage() {
         changeMode('signin')
         setNotice('비밀번호를 변경했습니다. 새 비밀번호로 로그인해 주세요.')
       } else {
-        setNotice(mode === 'forgot'
+        const link = methods?.localMail ? (await result.json() as { localMailLink?: string }).localMailLink : undefined
+        if (link && new URL(link).origin === location.origin) setLocalMailLink(link)
+        setNotice(link ? '테스트 메일을 만들었습니다. 아래에서 인증 링크를 열 수 있어요.' : mode === 'forgot'
           ? '등록된 이메일이라면 비밀번호 재설정 링크를 보냈습니다.'
           : '인증이 필요한 이메일이라면 인증 링크를 보냈습니다.')
       }
@@ -193,8 +198,10 @@ export function AccountPage() {
           <h1 id="ons-account-heading" tabIndex={-1} ref={heading}>
             <span className="ons-account-heading-icon"><HeadingIcon size={23} aria-hidden="true" /></span>{showAccount ? '내 계정' : headings[mode]}
           </h1>
-          {!showAccount && instructions[mode] && <p className="ons-account-hint">{instructions[mode]}</p>}
+          {!showAccount && instructions[mode] && <p className="ons-account-hint">{methods?.localMail
+            ? <>로컬 테스트 계정은 <code>@example.test</code> 이메일을 사용해 주세요.</> : instructions[mode]}</p>}
           {notice && <div className="ons-notice" role="status">{notice}</div>}
+          {localMailLink && <a className="ons-account-continue" href={localMailLink}>테스트 메일 링크 열기<ArrowRight size={17} aria-hidden="true" /></a>}
           {error && <div className="ons-error" role="alert">{error}</div>}
           {showAccount ? (
             <div className="ons-identity-panel" aria-busy={busy}>

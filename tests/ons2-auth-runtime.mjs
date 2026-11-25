@@ -145,7 +145,10 @@ test('verified email sessions, password resets and revocation stay server-side',
   const password = 'Synthetic account password 26!'
   const registered = await signup(email, password)
   assert.equal(registered.status, 200, await registered.clone().text())
-  assert.deepEqual(await registered.json(), { ok: true })
+  const receipt = await registered.json()
+  assert.equal(receipt.ok, true)
+  const registrationLink = new URL(receipt.localMailLink)
+  assert.equal(registrationLink.origin + registrationLink.pathname, origin + '/api/v1/auth/verify-email')
   assert.equal((await api('/auth/sign-in/email', { body: { email, password } })).status, 403)
 
   const verified = await verifyEmail(email)
@@ -159,6 +162,7 @@ test('verified email sessions, password resets and revocation stay server-side',
 
   const reset = await api('/auth/request-password-reset', { body: { email, redirectTo: origin + '/account' } })
   assert.equal(reset.status, 200)
+  assert.match(new URL((await reset.json()).localMailLink).pathname, /^\/api\/v1\/auth\/reset-password\//)
   const message = await env.DB.prepare("SELECT url FROM local_mail_fixtures WHERE kind = 'reset' AND email = ?").bind(email).first('url')
   assert.ok(message)
   const callback = await harness.fetch(message, { redirect: 'manual' })
