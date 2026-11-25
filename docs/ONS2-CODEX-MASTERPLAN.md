@@ -1,0 +1,80 @@
+# 박철한 온스 2.0 — Codex 마스터 개발 명세
+2026-11-25 / 제안 및 개발 기준 / 미배포
+이 문서는 목표와 수용 기준이다. 구현 완료나 운영 검증을 뜻하지 않는다. 원문 교재·회원 정보·비밀키는 포함하지 않는다.
+
+## 0. 현황과 작업 방식
+- main bcb6ee98b64a42c194f09b7a75797c06b6fa38ed: 기존 GitHub Pages. React 19 + TS + Vite + React Router + Dexie + Zod + Lucide + PWA + Vitest + Playwright 유지.
+- feature/study-number-range bccb8d24b963793fb474c6d587eef50b67710f88: 실제 교재 번호 시작/끝 지정 추가, 전체 테스트 대기.
+- feature/one-time-premium-codes d9dec90ed8ee0e8a15cf50d8c17d9788116539c4: 별도 Cloudflare Worker mjs, D1, R2, 코드·세션 초안. main과 분기(19 ahead, 6 behind)하므로 전체 병합 금지. 무기한 premium, 공용 관리자 비밀키, 이메일 미검증, 환경변수 없을 때 공개 모드, 장 전체 데이터 전송은 새 정책과 충돌하여 폐기/대체. 원자적 코드 등록 아이디어 및 테스트만 검토.
+- feature/cloudflare-admin-mcp는 번호 범위 브랜치를 기반으로 한다. main, 운영 DNS, 운영 DB, 기존 데이터, 공개판 배포를 임의 변경하지 않는다.
+- Codex: AGENTS.md와 DEVLOG, 기존 tests를 먼저 읽고 baseline 결과 기록. 비공개 개발 저장소/스테이징을 준비하고 기존 콘텐츠 라이선스 확인. 실제 키·사진·교재·DB 덤프를 Git/AI 로그에 넣지 않는다. 공개 저장소에서 이미 노출된 과거 문제는 회수 불가. 권리자 동의 및 공개 이력 대응을 출시 게이트로 둔다. 신규 기능은 synthetic fixture로 개발한다.
+- 각 PR은 하나의 기능 범위, 테스트/스크린샷/마이그레이션/롤백 근거 첨부. 완료와 미완료를 구별한다.
+
+## 1. 모듈형 아키텍처
+- 기존 src를 유지하며 src/features/{auth,account,verification,study,exam,review,tower,ranking,admin}, src/ui/{primitives,patterns,tokens}, src/game/{renderer,scenes,sprites,assets}, worker/{routes,middleware,services,repositories,auth,jobs}, shared/{contracts,domain}, migrations, tests/{unit,integration,e2e,visual}, docs/adr로 점진 분리한다. 큰 이동 PR 대신 기능별 이전. UI→서비스 API→도메인→저장소 방향, 서버 모듈 클라이언트 import 금지.
+- Cloudflare Workers + Static Assets(React/Vite), same-origin /api/v1; D1 DB, private R2 구매 사진/원본 보관, 별도 MCP Worker + service binding. OAuth KV는 프로토콜 상태에만 사용; 권한·코드·점수의 원장은 D1. 관리자 웹과 MCP는 같은 서비스/검증 함수 호출.
+- 공식 문서 https://developers.cloudflare.com/workers/framework-guides/web-apps/react/ ; https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/ ; https://developers.cloudflare.com/agents/model-context-protocol/protocol/authorization/
+- D1 제안: users, auth accounts/sessions/verifications, roles, seasons, purchase_requests, access_codes, entitlements, books, questions, question_revisions, question_references, correction_requests, study_sessions, attempts, exam_runs, exam_items, reports, tower_runs, tower_turns, tower_progress, rank_bests, rank_snapshots, moderation_events, audit_events, idempotency_receipts. FK, unique(season,user), unique(run,turn), unique(code hash), 정합성 인덱스, revision 및 UTC timestamps. 쿼리 bound params, migration은 버전 관리. D1 batch/조건부 쓰기/제약으로 원자성 검증, 지원되지 않는 transaction API 가정 금지.
+- 기존 3,129개 ID/번호/원문/표/해설·교재 버전 유지, 별도 서버 import 및 원본 SHA 검증. 수정은 원본 덮어쓰기 금지, 검증된 revision overlay로 표시. 기존 import/verify 지침과 충돌하지 않게 AGENTS.md를 승인된 새 규칙으로 갱신.
+- production/staging/local 각각 별도 리소스, 최소 권한 배포, secrets는 Wrangler/Cloudflare에만. npm ci lockfile, Node 버전 고정. 런타임 선택/SDK 호환성을 스테이징 실증.
+
+## 2. 인증·이용권
+- Google OAuth + 자체 이메일/비밀번호만 출시. 네이버/카카오는 provider 확장점만 설계. Better Auth + Drizzle D1 adapter 후보, 이메일 인증·비밀번호 재설정은 Resend 후보(도메인 인증/발송 제한 확인). verified email, 안정적 provider subject, 명시적 재인증 계정 연결; 동일 이메일만으로 자동 병합 금지. 비밀번호 해싱은 검증된 인증 라이브러리, 무차별 대입 제한, 열거 방지, CSRF/Origin/PKCE/state/nonce, HttpOnly Secure SameSite 쿠키, session revocation. 관리자 role은 서버에서 매번 검증, MFA 및 위험한 쓰기 재인증, 기본 거부.
+- 일반 무료 회원 1단계(504), 구매 인증 회원 2단계(1355)+3단계(1270)+모의고사+정식 무한의 탑. 정식 탑 무료 접근 불가; 1단계 맛보기는 별도 비랭크로만(선택). 로그인 전에는 소개/권리자가 허용한 샘플만. 기존 1단계 실전 모의고사도 잠금. 결제 기능 없음.
+- 시즌 종료: 2027-03-15 00:00 KST exclusive (2027-03-14T15:00:00Z). 서버 UTC 판정, 요청별 확인, 만료·회수 후 정답/문제 접근 차단. 기본 1단계는 무료 유지로 제안(전체 서비스 종료 여부는 소유자 확정). 시즌 갱신과 만료/잠금 UX, 과거 랭크 보존.
+- 신청: 로그인 → 네이버 카페 닉네임 + 교재 포스트잇 손글씨 + 임시 촬영용 난수(추가 제안) → private R2 → 관리자 수동 검토 → approved/rejected/resubmit → 사용자 귀속 코드 발급 → 입력 → entitlement. 카페 닉네임은 네이버 로그인/카페 회원 자격을 증명하지 않음. 코드 CSPRNG 128bit 이상, 서버 hash만 저장, 사용자/시즌/승인 요청 귀속, 발급 만료 제안 7일, 재발급시 이전 코드 폐기, 1회 원자적 사용/재전송 idempotency. 코드 화면 1회 표시, 안전한 전달, 로그 금지. 승인·권한 변경 audit. 사진 크기/MIME 실제 확인·EXIF 제거·비공개, 단기 보존/파기(예: 심사 완료 30일 이내, 정책 확정), 접근 기록·개인정보처리방침·탈퇴. 원본 사진을 MCP 응답에 기본 포함하지 않음; 관리자 직접 조회 또는 명시적 제한 조회.
+- 기존 브라우저 진도 마이그레이션은 사용자가 선택, 계정 격리, 임의 merge 금지. 서버 동기화는 stable question ID와 attempt events만. 민감 본문/해설/토큰은 IndexedDB, SW, backup, CDN, 정적 dist에 금지. 모의고사도 ID+사용자 답안만 저장. /api private,no-store; 과거 SW cache 이름 정리 및 안전한 업데이트/rollback 경로. 로그인 실패/네트워크 중단은 fail closed. 질문은 필요한 1개씩, 채점 서버, 해설은 제출 후; 시험/랭크 해설은 종료 이후, 복습에는 별도 권한 검사.
+
+## 3. 일반 학습 및 전체 UI/UX
+- 모바일 bottom nav: 홈·학습·무한의 탑·오답노트·내 정보, 실전 모의고사는 학습과 홈 바로가기. desktop sidebar/top bar, 동일 의미와 route. 모바일 320–430px, tablet 768, desktop 1280/1440. iOS safe-area, dynamic viewport, 폰트 확대, sticky OX controls가 긴 지문/해설을 가리지 않게. 44px 이상 touch target, 키보드 focus/aria/live, reduced-motion, 고대비.
+- 홈: 오늘 학습/이어 풀기 1순위, 무료/구매 인증 상태 및 만료 안내, 진행률, 오늘 오답, 단계별 목차, 모의고사/탑. 랭크 애니메이션은 별도 화면, 홈은 과하지 않게.
+- 로그인: Google 버튼(공식 브랜드 규칙), 이메일/비밀번호 + 보기/숨기기, 인증 메일 재전송·비번 재설정, 오류/로딩/만료/중복/복귀 경로. 인증 신청은 단계별 상태/사진 예시/촬영·파일 업로드/미리보기/재제출 사유.
+- 학습: 목차대로/랜덤/실제 교재 번호 시작~끝/같은 번호 단건, 10/20/30/50 빠른 범위, 선택 수, 이어 풀기, 범위 오류/빈 범위 방어. 본문 원문·표·출처 보존. 한 화면 OX 버튼 고정/다음 문제/해설 접기/오답 등록/문제 오류 신고. 모의고사 타이머/OMR/중간 저장/미응답/최종 결과/출제 근거. 오답노트 목차/검색/필터/복습 이력.
+- 계정: 표시 닉네임(공개 동의), 연결 로그인 관리, 학습 기록 내보내기, 이용권 상태, 세션 관리, 탈퇴. 이메일/실명은 랭킹에 미노출.
+- Apple-inspired: 밝은 중립 배경, 절제된 blue accent, Pretendard 또는 system Korean font(라이선스 검토), 충분한 여백, 단순 Lucide 아이콘, 일관된 radius/typography/spacing tokens. 기존 teacher 리소스 승인 범위에서 활용. 게임만 픽셀 그래픽, 문제 본문은 읽기 좋은 일반 폰트. 빈/잠금/로딩/오류/오프라인/만료/권한 회수 상태 모두 디자인. 모션은 피드백만, 사용자 끄기 가능. 색만으로 의미 표시 금지.
+- 기존 CSS를 점진 디자인 토큰으로 치환, shadcn/Radix 또는 기존 primitives 하나로 통일(혼용 방지). Tailwind는 필요성이 검증된 경우만 점진 도입. Storybook component stories, Playwright visual snapshots(고정 브라우저/폰트/시간/모션/가짜 데이터), axe-core 접근성, keyboard tests. baseline 변경은 승인 후, 자동 재생성 금지.
+
+## 4. 무한의 탑: 일반모드와 도전모드
+현행 src/challenge는 5정답/1스테이지, 하트3, local 점수, stage2/3 가변 비율, 좌우 캐릭터 이동. 유지할 리소스와 로직을 구분하고 ranked 신규 서비스로 전환.
+- 두 모드 공통: 1정답=1층 상승, 서버에서만 정답 및 진행 판정. 오답 시 층 이동 금지. 스테이지 번호와 교재 단계(1/2/3)는 별개. 탑은 시각적으로 무한하되 유한 문제 풀과 중복 정책 명시.
+- 일반모드: 정식 구매 회원에게 1/2/3단계 문제로 연습 제공(초기 가중 60/30/10 제안, 설정 가능). 시간제한/하트 소모 없음, 오답 즉시 해설 후 다시 풀기 또는 다른 문제. 여러 세션에 걸쳐 시즌 내 최초 정답을 기록한 고유 문항 수로 Bronze/Silver/Gold 진행; Bronze는 유효한 첫 일반모드 제출 시, Silver 50개, Gold 200개(초기 제안, 관리자 preview/version으로 조정). 오답 문제 반복 학습은 허용하되 동일 문항 점수 중복 금지. 중복 시에도 연습 층 상승 가능, 승급 진척 별도 표시. 일반모드 최고층은 참고 기록일 뿐 상대랭크 아님. 한 번도 정식 참여하지 않은 계정 Unranked, 분모 제외. 무료 1단계 학습은 랭킹 참여 아님. Gold 달성 시 도전모드 해금, 계정과 시즌 귀속.
+- 도전모드: 전범위 동일 규칙, 교재 2단계 50%, 3단계 50%. 2문항 블록마다 2/3 각 1개, 순서 무작위 → 완료 블록 정확히 50:50, 홀수 prefix 차이 최대 1. 문항 중복 금지(한 run 및 가능한 최근 run 간 회피), 공급 부족 시 세션 종료/기록 정책, 난이도/목차 비중 및 공정한 출제는 별도 통계 확인. 한 문제 정답당 1층, 오답/시간 초과 하트 -1, 3하트 소진 종료, 층 유지하고 새 문제, 해설은 종료 후. 초기 타이머는 읽기 길이 반영한 서버 기준(권장 30–60초), 빠른 답 자체에 점수 가산 없음. 최종 확정 전 실제 문항 길이/유저 데이터로 튜닝. 유효 도전 기록은 서버 채점 및 세션 종료(중단 처리 일관), 동일 시즌/룰/콘텐츠 버전으로 산정. 최고 클리어층 우선, 동점은 해당 기록 최초 달성 시각 오름차순, 마지막 안정 ID. 초기 실력 하한: P 20층, D 40층(제안). 최고점은 룰이 같을 때만 비교. 1인 1 active ranked run, turn nonce + deadline + sequence + idempotency. 중복/위조/재전송/조작된 시간/다른 계정 요청은 거절. refresh/network drop은 기존 turn 복구, 같은 점수 이중 적립 불가; 서버의 명시적인 일시 장애 처리 정책. score=server derived, client score·answer key·seed 미노출.
+- 상대 티어: N=현재 시즌 정식 유효 일반모드 제출 ≥1, 정상/랭킹 유효 계정의 고유 인원(언랭 제외). Diamond cap=floor(N*0.01), 상위 티어 합계 cap=floor(N*0.10); Platinum은 Diamond 제외 상위 10% 범위. N<100 D 없음; N<10 P 없음. Gold 달성 + 정식 도전 최고 기록 + 각 최소층 조건을 충족한 사람만 후보; 조건 미달이면 자리 비움. 동점은 결정적 정렬(점수 내림차순, 시각 오름차순, ID 오름차순), 동점자 무제한 승급 금지. 상위 N과 P/D 인원 제한을 스냅샷으로 일관 적용. 시즌 종료/이용권 회수/정지/부정 기록의 분모 포함 정책 명시: 정상 유효 계정만, 권한 만료 시 시즌 최종 스냅샷 보존. 상대 티어는 정기 snapshot(예: 5분)에서 갱신, 순위와 갱신 시각 표시, 개인 최고 달성 티어는 별도 기록. 낮아져도 Gold 해금 유지. 일시적인 인원 변동에 대비한 설명, 수동 티어 부여 금지. 시즌 규칙 변경은 dry-run 분포 예측→버전 고정→새 랭크 시즌/구간 또는 명시적 재계산. 자동 규칙 변경 금지.
+- 예시 N=300: D 최대3, P+D 최대30(P 최대27 if D3), N=1000 D10 P+D100. 소규모/동점/정지/유효 기록 부족/시즌 종료/중복 제출 테스트.
+- 랭킹 화면: 내 티어+개인 최고층+현재 순위/참여자 수/상위 %, 다음 티어 목표, Gold 잠금 안내, 랭킹 상위/내 주변, 익명화한 공개 닉네임(동의), 티어 설명, 규칙 버전 및 마지막 갱신, 신고/부정 기록 처리. 순위를 강제로 노출하지 말고 공개 선택; 점수는 전체 유효 모집단으로 산정. 훈련/랭크 구분, 타이머 부담 최소화, 하루 목표/종료를 존중하는 UX.
+
+## 5. 도트 게임 엔진 및 아트
+- Phaser(안정 major 고정, TypeScript/Vite 호환 검증) 선택: https://github.com/phaserjs/phaser ; Canvas/WebGL 렌더, tilemap, sprite atlas, camera, tween, particles. 화면 안 작은 lazy-loaded canvas만 사용, 로그인·문제·OX 버튼·해설은 React DOM. 게임 점수/권한은 엔진에서 계산하지 않는다. React가 서버 이벤트(correct,missed,rankChanged)만 renderer에 전달. canvas init once/destroy on unmount, resize, context loss, low-memory fallback, hidden tab pause rendering not timer. reduced-motion 정적 모드, 사운드 기본 off 또는 저장된 설정, 스킵 가능.
+- Pixelorama https://github.com/Orama-Interactive/Pixelorama 로 editable sprite sources + PNG atlas/JSON; Tiled https://github.com/mapeditor/tiled 로 16x16 tileset + map JSON. 공식/직접 제작 라이선스 기록, 제3자 캐릭터·음원 무단 복제 금지. 기존 teacher.webp 및 teacher-reactions.webp 특징 유지, 소유자/권리자 허가 확인. AI 초안 후 프레임 수작업 QA: 동일 실루엣/얼굴/안경 여부 등 실제 원본 기준, 동일 anchor/팔레트/정렬, 픽셀 정수 배율 nearest-neighbor, 축 늘림 금지. 48x64 또는 64x64 캐릭터, 16px tile, 320x192 또는 320x240 logical canvas, responsive letterbox/scale. 원본 소스·atlas·manifest·license/credits 유지. 새 리소스는 별도 lazy chunk/용량 예산.
+- 5개 시각 테마: Bronze 햇살 서재/가죽 가방·책, Silver 달빛 기록관/은빛 코트·깃펜, Gold 황금 법전의 전당/월계관·황금 책, Platinum 청록 별빛 성채/망토·빛나는 법전, Diamond 하늘의 재판정/결정 왕관·별빛 오라. 독자적 등급 emblem/색+아이콘+텍스트, 랭킹용 얼굴/배지/전신 캐릭터. 실제 선생님 원본을 확인한 뒤 승인.
+- tower tiles: 앞/중간/배경 3층 parallax, 반복 가능한 층·계단·문·창·구름, 층별 장식 변주, 10층마다 체크포인트 연출, 50층마다 풍경 전환(보상 룰과 독립). 올바른 답→0.5~0.8초 climb(6~10프레임)+camera pan/easing+작은 파티클→다음 문제, 오답→2~4프레임 표정/하트 변화, 승급→1~1.5초 전용 연출 후 스킵 가능. idle 4~6, walk/climb 6~10, cheer 6~8, miss 4~6 frames; 모션 줄이기 지원. 장면은 점진 이동/재활용 pool, 수천층 전부 로드 금지. 고퀄리티 판단은 실제 assets+mobile recording 및 승인으로, placeholder/AI rough는 완성으로 기록 금지.
+- UX: 게임 상단은 현재층, 남은 하트(도전), 내 티어, 타이머, sound, 종료. 장면 아래 읽기 편한 문제와 OX 버튼, canvas가 입력/스크롤 가리지 않음. 정답/오답 상태 서버 응답을 기다리고 중복 탭 방지. 결과는 최고층·정답/오답·등급·랭킹·오답 복습·종료. 사운드/캐릭터는 정답률 또는 공부 시간에 악영향 없는지 검증.
+
+## 6. 관리자 웹 / GPT MCP
+- 관리자 메뉴: 대시보드, 인증 대기열/사진 상세/재제출, 코드 발급/폐기/이력, 회원·권한·정지, 교재/문제 검색·수정 미리보기·오류 신고·법령/판례 근거·버전 이력·롤백, 랭킹/부정 기록/시즌·룰 미리보기, 릴리스/장애/보안 이벤트, 개인정보/삭제 대장. 숫자는 실제 API 데이터, 빈/로딩/실패 상태, 검색/필터/페이지네이션, 위험 조치 확인.
+- MCP separate worker OAuth2.1 Streamable HTTP with Cloudflare Agents SDK and @modelcontextprotocol/sdk (실제 버전 및 ChatGPT 호환/연결 검증). 인증된 관리자 scope 분리 question:read/review/write, member:review/grant, ranking:read/moderate, audit:read, release:read. 현재 DB role/session 상태 매 요청 확인, default deny, tool annotation/readOnly 및 destructive 표시를 권한으로 신뢰하지 않음. 관리자 웹과 동일 서비스, 모델 지시를 신뢰 경계로 사용 금지. 최소 데이터/출력 크기 제한, cursor, secrets·PII 로그 금지. MCP URL/issuer/audience/scopes 검증, Inspector 및 실제 ChatGPT 등록/호출 검증.
+- 조회: search_questions(번호/단계/텍스트/법령), get_question, list_reports, get_question_history, get_book_integrity, list_verifications, get_verification, list_members, get_member_access, get_rank_snapshot, get_rank_rules, list_security_events, list_development_issues.
+- 검증/수정: validate_question_correction, preview_question_update(question_id,expected_revision,patch,reason,evidence,request_id), apply_question_update(preview_token,expected_revision,request_id) 명시적 승인 후만; 변경 전후 diff, 정오/해설/출처/시행일·판례번호, 원본은 immutable, 독립 revision 및 undo. 토큰 사용자/스코프/정규화 payload/expiry 귀속, 단일 사용 및 동일 request_id replay 결과, revision 충돌 409, audit 원자성. 법 개정/정오 근거는 공식 출처 및 시행일 확인, 추정 수정 금지. 일괄 수정 preview 건수/페이지 분할/검증 후 승인. 기존 학습 답안은 풀이 당시 revision을 유지, 정오 변경 시 안내 및 해당 랭크 문제 영향 확인·격리/재산정은 별도 승인.
+- 운영: preview_approval/approve_verification, reject_verification, issue_access_code(approved request + account + season), revoke_access_code, revoke_entitlement, preview_season_update/apply, preview_rank_rules/apply, preview_rank_moderation/apply, get_operation_status. 실제 write 시 사용자 확인/감사로그, 동일 operation id 중복 방지, raw code 반환은 최소 노출(관리자 웹 우선). 코드 전체 목록 원문 반환 금지. 랭크 기록 직접 점수 변경 금지, 근거 있는 invalidation 후 재계산 및 감사.
+- 개발 내역: Git docs/DEVLOG + ADR + PR + CI가 구현 진실의 원장. 운영 이슈 DB는 별도 id/status/revision/deployment_history/verification_history, MCP 조회/수정 expected_revision으로 연결 가능. AI가 테스트/배포 여부를 만들어내지 않음.
+
+## 7. 오픈소스 채택표 (필요한 것만)
+- Workers: wrangler + @cloudflare/vite-plugin, Hono (honojs/hono), Drizzle ORM (drizzle-team/drizzle-orm), Better Auth (better-auth/better-auth), Zod (기존), Cloudflare Agents SDK + official MCP SDK. Google OAuth/email password 공식 docs: https://better-auth.com/docs/authentication/email-password . Resend는 이메일 서비스(오픈소스 자체 호스팅이 아님); 공급자 interface로 교체 가능.
+- React: 기존 React Router, Dexie(비민감 legacy records만), Lucide, TanStack Query(서버 state), React Hook Form+Zod(복잡한 양식), Radix/shadcn(하나의 primitives 선택), CSS tokens; Motion은 복합 UI transition 필요 시에만, CSS first. TanStack Table은 관리자 대규모 표에만.
+- Game: Phaser, Pixelorama, Tiled. 신규 엔진을 학습 메인 UI에 전역 import 금지.
+- QA: Vitest, Cloudflare Workers Vitest integration/Miniflare, Playwright Chromium/WebKit + actual Android/iOS, Storybook, axe-core, ESLint, Prettier, dependency review/Dependabot, secret scanning, CodeQL(사용 가능 환경에서), npm audit 검토. visual docs https://playwright.dev/docs/test-snapshots . 모든 의존성 lockfile/라이선스/호환/유지보수/취약점 체크, 패키지 하나가 보안·유지보수 보장하지 않음. 중복 프레임워크/무작정 전체 UI 재작성 금지.
+
+## 8. 구현 순서 및 출시 게이트
+P0-A baseline, 저장소/저작권/과거 배포 위험, 샘플 데이터, 비공개 Git, CF staging, API fail closed, CI artifact scan.
+P0-B D1 migrations/Google+email 회원가입/세션/관리자 권한, 이용권 만료, R2 사진, 승인/코드 원자성, 관리자 웹.
+P0-C 문제 API/채점/모의고사/오답/진도 migration, 번호 지정 회귀, PWA safe update, MCP OAuth/read/preview/apply/audit 및 실제 ChatGPT 연결. 인증 없는 API, 무료/만료/정지, 직접 URL, 빌드·SW·백업 문제 노출, 코드 2계정 동시 등록, CSRF/IDOR, admin revoke, token expiry, stale revision/idempotency 검증.
+P1-A UI design tokens, 홈/학습/계정/모의고사/관리자 반응형·a11y·visual snapshots. 모든 기존 기능 보존.
+P1-B 일반 탑/도전모드/순위·점수 서버 검증, 관리자 rank rules preview, 부정 기록/재산정, 기존 챌린지 전환. feature flag로 닫아두고 검증.
+P1-C Phaser 아트 파이프라인·실제 5 티어 sprite/무한층 연출, 모바일 측정, 모션 줄이기·low power fallback. 최종 실제 도트 리소스 검토 후 공개.
+P2 통계·시즌 확장/추가 교재·소셜 로그인 확장점. 이번 범위에 PG·네이버 로그인 없음.
+- CI: npm ci, verify:book(권한 있는 private import 또는 synthetic fixtures), typecheck web/server, lint, unit, integration local D1 migrations, build, e2e chromium/webkit, visual/a11y, artifact scan for premium JSON/answers/secrets, dependency/license. rank N=0,1,9,10,99,100,300,1000, ties, ineligible, invalidation, rule versions, 50:50, retries, clock tamper. Playwright mobile 320/390/430/768 and desktop; no overflow, long prompt, auth and purchase workflow, direct routes, refresh, expired session, stale SW. Load test 100 concurrent synthetic users with measured p95/error/read/write and rate limits, no unsupported performance claim.
+- Staging deploy with separate resources + smoke test + D1 backup/export/time-travel review, migrate additive first, rollback compatible code/schema. Private production deploy only after owner approval, legal/data protection sign-off and measured test results. Old GitHub Pages route/legacy SW/cache migration, custom domain and Google callback URL switch. Preserve study IDs. Document actual deployment SHA, time, commands, test totals, observed failures, limitations, rollback command. No live tokens in chat.
+- Codex deliverables: architecture and ADRs, exact migration plan, wrangler config templates (no real secrets), schema + shared contracts, feature PRs, admin/MCP tool contract docs, art source/credits/asset budget, CI tests, runbook/backup/recovery, actual staging screenshots/recordings and verified release report. Each milestone report file list and tests; never mark unrun tests passed.
+
+## 9. 미확정 기본값
+- 일반모드 50/200 승급, 60/30/10 출제, 하트 3, 랭크 20/40층 하한, 타이머 30–60초, 5분 갱신, 코드 7일, 사진 30일은 초기 제안. 관리자 설정/룰 버전화; 실제 데이터 및 사용자 승인으로 확정. 상위 10%는 Diamond 포함, Diamond 상위 1%, 내림 처리. 무료 1단계 유지 및 무료 비랭크 맛보기 여부 확정. 공개 닉네임 옵트인. 권리자 허락·Cloudflare/Google/Resend 연결 미완료. 기존 캐릭터 실제 디자인 검수 필요.
