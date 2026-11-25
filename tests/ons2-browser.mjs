@@ -83,6 +83,7 @@ test('a mobile learner solves one printed number and moves only allowlisted lega
     const question = page.getByRole('heading', { name: '교재 2번' })
     await expect(question).toBeFocused()
     await expect(page.getByRole('region', { name: '정답 및 해설' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: '기본 OX 풀이 통계' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: '문제 고르기' })).toHaveCount(0)
     await page.screenshot({ path: '.ons2/qa/study-question-320.png', animations: 'disabled' })
     await page.setViewportSize({ width: 1280, height: 820 })
@@ -91,6 +92,7 @@ test('a mobile learner solves one printed number and moves only allowlisted lega
     await page.setViewportSize({ width: 320, height: 850 })
     await page.getByRole('button', { name: 'X 틀리다', exact: true }).click()
     await expect(page.getByText('내 답 X · 정답 O')).toBeVisible()
+    await expect(page.getByRole('region', { name: '기본 OX 풀이 통계' })).toContainText('통계 수집 중')
     await page.getByRole('button', { name: '학습 마치기' }).click()
     await page.getByRole('link', { name: '오답노트', exact: true }).click()
     await expect(page.getByRole('button', { name: '1단계 교재 2번' })).toBeVisible()
@@ -394,6 +396,31 @@ test('the admin screen reveals a newly issued ticket once and shows its status',
   } finally {
     await page.close()
   }
+})
+
+test('the mobile analytics dashboard exposes budget delays and contains wide tables', async () => {
+  const page = await browser.newPage({ viewport: { width: 320, height: 750 } })
+  try {
+    await page.route('**/api/v1/session', (route) => route.fulfill({ json: {
+      user: { name: '합성 관리자' }, admin: { mfaEnabled: true, mfaFresh: true },
+    } }))
+    await page.route('**/api/v1/admin/study-statistics?*', (route) => route.fulfill({ json: {
+      items: [{ no: 1, stage: 1, part: 1, chapter: 1, section: null, version: 1, sample: 30,
+        total: 40, firstAccuracy: 10, repeatAccuracy: 60, selectedO: 60, meanSeconds: 5, difficulty: '매우 어려움', flags: [] }],
+      next: false, totals: { attempts: 40, firstCorrect: 3, firstWrong: 27, repeatCorrect: 6, repeatWrong: 4 },
+      boundaries: [90, 75, 50, 30], qualityPaused: true,
+      budget: { status: 'paused', calculatedAt: 1, observedAt: 1, reads: 250000, writes: 10000,
+        accountReads: 200000, accountWrites: 98000, accountRequests: 20000 },
+    } }))
+    await page.goto(baseURL + '/admin?view=statistics')
+    await expect(page.getByRole('heading', { name: '문항 분석', exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: '통계 작업 예산' })).toContainText('일시 중지')
+    const result = page.getByRole('region', { name: '문항 분석 결과' })
+    await expect(result.getByRole('table')).toBeVisible()
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    assert.equal(await result.evaluate((element) => element.scrollWidth > element.clientWidth), true)
+    await page.screenshot({ path: '.ons2/qa/study-statistics-admin-320.png', fullPage: true })
+  } finally { await page.close() }
 })
 
 test('login and password recovery are usable in iPhone-sized WebKit', async () => {

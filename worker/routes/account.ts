@@ -5,6 +5,7 @@ import { json, privateHeaders, readSmallJson } from '../http'
 import { readMemberAccess, redeemAccessCode } from '../services/book-access'
 import { adminPrefix, adminPurchaseRoute, memberPurchaseRoute, purchasePath } from './purchases'
 import { studyPrefix, studyRoute } from './study'
+import { statisticsAdminPath, statisticsAdminRoute } from './analytics'
 import { examPrefix, examRoute } from './exams'
 
 const sessionPath = '/api/v1/session'
@@ -81,7 +82,7 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
     const suspended = await env.DB.prepare('SELECT 1 FROM member_controls WHERE user_id = ? AND suspended_at IS NOT NULL')
       .bind(id).first()
     if (suspended) return json({ error: 'account_suspended' }, 403, method)
-    if (study) return await studyRoute(request, env.DB, url, id)
+    if (study) return await studyRoute(request, env, url, id)
     if (exam) return await examRoute(request, env.DB, url, id)
 
     const admin = (readSession || adminRoute)
@@ -91,6 +92,9 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
     if (adminRoute) {
       if (!admin) return json({ error: 'forbidden' }, 403, method)
       if (!admin.mfaFresh) return json({ error: 'mfa_required' }, 403, method)
+      if (path === statisticsAdminPath || path.startsWith(statisticsAdminPath + '/')) {
+        return await statisticsAdminRoute(request, env, url, id)
+      }
       return await adminPurchaseRoute(request, env, url, id)
     }
     if (purchaseRoute) return await memberPurchaseRoute(request, env, id)

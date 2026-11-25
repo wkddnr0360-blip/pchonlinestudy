@@ -1,9 +1,11 @@
 import type { ExplanationBlock, Ox, Question, Stage } from '../src/book/types'
+import type { StudyStatistics } from './study-statistics'
 
 export interface StudyCatalog {
   questions: StudyIndexEntry[]
   outline: StudyOutlineLabel[]
   access: { bookVerified: boolean }
+  recommendationsAvailable?: boolean
 }
 
 export interface StudyIndexEntry {
@@ -30,6 +32,7 @@ export interface StudyQuestion {
   revision: number
   prompt: string
   source: string
+  statisticsContext?: { eventId: string; proof: string }
 }
 
 export interface StudyResult {
@@ -37,6 +40,7 @@ export interface StudyResult {
   answer: Ox
   marker: Question['marker']
   explanation: ExplanationBlock[]
+  statistics?: StudyStatistics
 }
 
 export interface StudyProgress {

@@ -5,8 +5,9 @@ import { stagePresentation } from '../../app/stages'
 import { Explanation } from '../../ui/QuestionContent'
 import type { StudyQuestion, StudyResult } from '../../../shared/study'
 import { StageArtwork } from './StageArtwork'
+import { StudyResultStatistics } from './StudyResultStatistics'
 
-export interface StudyTurn { question: StudyQuestion; eventId: string; choice?: Ox; result?: StudyResult }
+export interface StudyTurn { question: StudyQuestion; eventId: string; practice?: boolean; choice?: Ox; result?: StudyResult }
 
 export function StudyReader({ turn, position, total, busy, error, onAnswer, onBack, onNext }: {
   turn: StudyTurn; position: number; total: number; busy: boolean; error: string;
@@ -46,6 +47,7 @@ export function StudyReader({ turn, position, total, busy, error, onAnswer, onBa
           <span><strong>{result.correct ? '정답입니다.' : '틀렸습니다.'}</strong><small>내 답 {turn.choice} · 정답 {result.answer}</small></span>
         </p>
         <details open><summary>해설</summary><Explanation question={result} /></details>
+        {result.statistics && <StudyResultStatistics statistics={result.statistics} />}
         <div className="study-next">
           <button type="button" className="ons-button study-next-button" disabled={busy} onClick={hasNext ? onNext : onBack}
             aria-label={hasNext ? '다음 문제' : '학습 마치기'} title={hasNext ? '다음 문제' : '학습 마치기'}>

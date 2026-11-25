@@ -15,6 +15,8 @@
     "test:e2e": "playwright test",
     "test:ons2:runtime": "node --test tests/ons2-runtime.mjs tests/ons2-auth-runtime.mjs",
     "test:ons2:browser": "node --test tests/ons2-browser.mjs",
+    "verify:ons2:statistics-schema": "drizzle-kit generate --config drizzle.config.ts && node scripts/check_ons2_statistics_schema.mjs",
+    "bench:ons2:statistics": "node --experimental-strip-types scripts/benchmark_ons2_statistics.mjs",
     "verify:book": "python3 scripts/verify_book.py",
     "build": "npm run typecheck && vite build",
     "build:ons2": "tsc -p tsconfig.worker.json && npm run typecheck && vite build --config cloudflare/vite.config.ts && node scripts/verify_worker_assets.mjs",
@@ -29,12 +31,16 @@
     "better-auth": "1.7.28",
     "dexie": "^4.2.1",
     "dexie-react-hooks": "^4.2.0",
+    "drizzle-orm": "0.45.4",
     "jpeg-js": "0.4.4",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.12.0",
     "zod": "^4.6.7"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": { "esbuild": "0.25.12" }
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261125.1",
@@ -43,6 +49,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.1.0",
+    "drizzle-kit": "0.31.11",
     "fake-indexeddb": "^6.2.0",
     "typescript": "^5.9.0",
     "vite": "^7.3.0",

@@ -16,9 +16,10 @@ const methods = [
 ] as const
 type Mode = typeof methods[number]['value']
 
-export function StudySetup({ stage, catalog, busy, error, resumeNo, onResume, onOpen }: {
+export function StudySetup({ stage, catalog, busy, error, resumeNo, onResume, onOpen, recommendations, onRecommend, onPractice }: {
   stage: Stage; catalog: StudyCatalog; busy: boolean; error: string; resumeNo?: number;
-  onResume: () => void; onOpen: (numbers: number[]) => void
+  onResume: () => void; onOpen: (numbers: number[]) => void; recommendations?: number[];
+  onRecommend: (mode: 'personal' | 'common') => void; onPractice: (numbers: number[]) => void
 }) {
   const [scope, setScope] = useState<OutlineScope | null>(null)
   const [scopeLabel, setScopeLabel] = useState<string | null>(null)
@@ -75,6 +76,17 @@ export function StudySetup({ stage, catalog, busy, error, resumeNo, onResume, on
       <RotateCcw size={19} aria-hidden="true" /> {resumeNo}번 이어 풀기 <ArrowRight size={18} aria-hidden="true" />
     </button>}
     {error && !scopeLabel && <p className="study-error" role="alert">{error}</p>}
+    {catalog.recommendationsAvailable && <section className="study-panel study-recommendation" aria-label="맞춤 복습">
+      <div><h2>맞춤 복습</h2><p>내 오답이나 기본 OX에서 오답이 많은 문항을 복습합니다.</p></div>
+      <div className="study-quick">
+        <button type="button" className="study-secondary" disabled={busy} onClick={() => onRecommend('personal')}>내 오답</button>
+        <button type="button" className="study-secondary" disabled={busy} onClick={() => onRecommend('common')}>오답 빈출</button>
+        {recommendations && (recommendations.length > 0
+          ? <button type="button" className="study-secondary" disabled={busy} onClick={() => onPractice(recommendations)}>
+          <RotateCcw size={17} aria-hidden="true" />{recommendations.length}문제 다시 풀기</button>
+          : <p role="status">지금 복습할 문항이 없습니다.</p>)}
+      </div>
+    </section>}
     <StudyOutline stage={stage} catalog={catalog} onSelect={selection} />
     <Dialog.Root open={scopeLabel !== null} onOpenChange={(open) => { if (!open && !busy) setScopeLabel(null) }}>
       <Dialog.Portal>

@@ -73,3 +73,13 @@ npx wrangler d1 execute DB --local --file .ons2/private/normalized-book.sql --co
 부여된 권한으로 실제 전체 교재를 사용할 수 있는 환경에서 목차명, 문항 수, 기출 출처를 대조한 뒤 운영 적용을 검토한다. 2026-11-26 외부 스테이징 D1에 목차·모의고사 마이그레이션을 적용하고 미적용 마이그레이션이 없음을 확인했다. 실제 교재 적재와 앱 로그인 연동은 대기 중이다.
 
 `/study`에서 허용된 단계와 번호 범위, 답 제출 후 해설 표시, 오답 재풀이를 확인한다. 기존 OX 기록은 동일 주소의 브라우저 또는 온스 JSON 백업에서 선택하고, 이메일이 표시된 수신 계정으로 이관을 확정한다. 서버는 문제 번호, 사용자 답, 시각, 중복 식별자를 수신한다. 기존 시험 내용과 저장된 채점값은 브라우저에서 이관 요청에 포함하지 않는다. 기존 시험 및 오답 해소 상태는 후속 이관 범위다.
+
+## 기본 OX 문항 분석
+
+외부 스테이징에 `0009_study_statistics.sql`과 Worker `e81a47d7`를 적용했다. 현재 분석 플래그는 0이다. 새 컬럼을 넣기 이전의 풀이와 브라우저 이관 기록은 기존 진도에 반영된다. 문항 분석은 활성화 이후 기본 OX에서 받은 서명된 풀이를 기준으로 시작한다. 풀이 시간은 문제 전송과 제출 시각이 확인된 1초 이상 10분 이하 응답의 평균이다.
+
+1. 별도 환경에 `0009_study_statistics.sql`을 적용한다. `npm run verify:ons2:statistics-schema`가 Drizzle Kit의 산출물을 임시 디렉터리에 생성하고 실제 Wrangler 마이그레이션의 컬럼·기본값·키를 대조한다. Wrangler가 적용 이력의 기준이다.
+2. 분석을 활성화하기 전에 해당 계정의 Free 플랜을 확인한다. `ANALYTICS_ACCOUNT_ID`를 환경 변수로, **해당 계정만** 대상으로 한 `Account Analytics: Read` 토큰을 `ANALYTICS_METRICS_TOKEN` Worker 시크릿으로 넣는다. `ANALYTICS_ENABLED=1`과 매 5분 Cron `*/5 * * * *`을 설정하고 구매 사진의 매시간 Cron도 함께 등록한다. 대시보드 계정 지표가 연결되기 전에는 분석 플래그를 0으로 둔다. 로컬 테스트는 합성 지표를 사용한다. [Cloudflare Analytics 토큰](https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/)
+3. 기본 OX 응답을 여러 회원으로 제출해 `/admin?view=statistics`에서 체크포인트, 표본, 지연 상태를 확인한다. 초과한 작업은 한국 시간 오전 9시 일일 한도 리셋 이후 재개한다. 사용량 없이 집계가 진행되지 않는지와 채점은 반환되는지도 확인한다. `npm run bench:ons2:statistics`의 100개 병렬 작업은 로컬 D1 쿼리 측정이다.
+4. 오탈자와 의미를 유지한 교정은 새 리비전을 실제 출제판으로 전환하는 트랜잭션에서, 활성 리비전을 갱신하기 전에 `study_statistics_versions`에 새 리비전과 기존 통계 버전을 연결한다. 정답 또는 판단 기준이 바뀌면 새 리비전 자체가 통계 버전이 된다. 승인된 출제판 발행 흐름과 함께 적용한다.
+5. 사용량 이상이나 롤백 시 `ANALYTICS_ENABLED=0`으로 배포하고 분석 Cron을 제거한다. 통계 마이그레이션의 컬럼·데이터를 보존해 이후 해당 체크포인트부터 재개할 수 있다. Cloudflare 계정 한도와 결제 정책은 계정 소유자 승인 후 변경한다. [D1 요금과 한도](https://developers.cloudflare.com/d1/platform/pricing/) · [Workers 지출 한도](https://developers.cloudflare.com/workers/platform/spend-management/)

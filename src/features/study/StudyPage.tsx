@@ -25,6 +25,7 @@ export function StudyPage() {
   const [sequence, setSequence] = useState<number[]>([])
   const [position, setPosition] = useState(0)
   const [review, setReview] = useState<Review>()
+  const [recommended, setRecommended] = useState<number[]>()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -61,14 +62,22 @@ export function StudyPage() {
     } finally { setBusy(false) }
   }
 
+  async function loadQuestion(numbers: number[], index: number, practice: boolean) {
+    const { question } = await studyRequest<{ question: StudyQuestion }>('/study/questions/' + numbers[index] + (practice ? '' : '?mode=basic'))
+    setSequence(numbers)
+    setPosition(index)
+    setTurn({ question, eventId: question.statisticsContext?.eventId ?? crypto.randomUUID(), practice })
+    setReading(true)
+  }
+
   function open(numbers: number[], index = 0) {
-    if (!numbers.length) return
+    if (numbers.length) void run(() => loadQuestion(numbers, index, route.review))
+  }
+
+  function loadRecommendations(mode: 'personal' | 'common') {
     void run(async () => {
-      const { question } = await studyRequest<{ question: StudyQuestion }>('/study/questions/' + numbers[index])
-      setSequence(numbers)
-      setPosition(index)
-      setTurn({ question, eventId: crypto.randomUUID() })
-      setReading(true)
+      const { numbers } = await studyRequest<{ numbers: number[] }>(`/study/recommendations?stage=${route.stage}&mode=${mode}`)
+      setRecommended(numbers)
     })
   }
 
@@ -78,7 +87,7 @@ export function StudyPage() {
     setTurn({ ...turn, choice })
     void run(async () => {
       const { result } = await studyRequest<{ result: StudyResult }>('/study/answers', {
-        body: { eventId, no: question.no, revision: question.revision, choice },
+        body: { eventId, no: question.no, revision: question.revision, choice, statisticsProof: question.statisticsContext?.proof },
       })
       setTurn({ ...turn, choice, result })
       setProgress((old) => old && { ...old, lastNo: question.no })
@@ -112,7 +121,7 @@ export function StudyPage() {
   </main>
 
   if (turn && reading) return <StudyReader turn={turn} position={position} total={sequence.length} busy={busy} error={error}
-    onAnswer={answer} onBack={closeReader} onNext={() => open(sequence, position + 1)} />
+    onAnswer={answer} onBack={closeReader} onNext={() => void run(() => loadQuestion(sequence, position + 1, turn.practice ?? false))} />
 
   if (route.review) return <main className="study-page study-review-page ons-container">
     <header><NotebookPen size={27} aria-hidden="true" /><h1>오답노트</h1></header>
@@ -133,7 +142,9 @@ export function StudyPage() {
   const relevantRecent = catalog.questions.some((item) => item.stage === stage && item.no === recentNo) ? recentNo ?? undefined : undefined
   const unfinished = turn && !turn.result
   return <StudySetup stage={stage} catalog={catalog} busy={busy} error={error} resumeNo={unfinished ? turn.question.no : relevantRecent}
-    onOpen={open} onResume={() => {
+    onOpen={open} recommendations={recommended} onRecommend={loadRecommendations}
+    onPractice={(numbers) => void run(() => loadQuestion(numbers, 0, true))}
+    onResume={() => {
       if (unfinished) setReading(true)
       else if (relevantRecent !== undefined) {
         const remaining = catalog.questions.filter((item) => item.stage === stage && item.no > relevantRecent).slice(0, 10)

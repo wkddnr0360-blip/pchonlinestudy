@@ -1,10 +1,12 @@
-import { ArrowUpRight, BookOpen, ClipboardCheck, House, KeyRound, ShieldCheck, UserRound } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { ArrowUpRight, BookOpen, ChartNoAxesColumnIncreasing, ClipboardCheck, House, KeyRound, ShieldCheck, UserRound } from 'lucide-react'
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
 import onsIcon from '../../../public/icons/ons-192.png'
 import type { AdminPurchase, PurchaseFilter, PurchaseQueue } from '../../../shared/purchase'
 import { PurchaseQueueView } from './PurchaseQueue'
 import { PurchaseReview } from './PurchaseReview'
 import './purchase-admin.css'
+
+const StudyStatisticsAdmin = lazy(() => import('./StudyStatisticsAdmin').then((module) => ({ default: module.StudyStatisticsAdmin })))
 
 type Session = { user?: { name: string }; admin: { mfaEnabled: boolean; mfaFresh: boolean } | null }
 
@@ -26,6 +28,7 @@ export function PurchaseAdminPage() {
   const [selected, setSelected] = useState<AdminPurchase | null>(null)
   const opener = useRef<HTMLButtonElement>(null)
   const pendingVerification = new URLSearchParams(location.search).has('verify')
+  const showStatistics = new URLSearchParams(location.search).get('view') === 'statistics'
   const ready = session?.admin?.mfaFresh === true
 
   async function loadSession() {
@@ -52,7 +55,7 @@ export function PurchaseAdminPage() {
 
   useEffect(() => { void loadSession().catch((failure) => setError(failure.message)) }, [])
   useEffect(() => {
-    if (!ready) return
+    if (!ready || showStatistics) return
     const request = new AbortController()
     setBusy(true)
     setError('')
@@ -60,7 +63,7 @@ export function PurchaseAdminPage() {
       .catch((failure) => { if (!request.signal.aborted) setError(failure.message) })
       .finally(() => { if (!request.signal.aborted) setBusy(false) })
     return () => request.abort()
-  }, [ready, page, filter, query])
+  }, [ready, page, filter, query, showStatistics])
 
   async function run(action: () => Promise<void>) {
     setError('')
@@ -98,7 +101,7 @@ export function PurchaseAdminPage() {
         return
       }
       setSetup(null)
-      history.replaceState(null, '', '/admin')
+      history.replaceState(null, '', showStatistics ? '/admin?view=statistics' : '/admin')
       await loadSession()
     })
   }
@@ -115,7 +118,8 @@ export function PurchaseAdminPage() {
     <aside className="ons-admin-sidebar">
       <a className="ons-admin-brand" href="/admin"><img src={onsIcon} alt="" width="38" height="38" /><span><strong>박철한 온스</strong><small>관리자 센터</small></span></a>
       <nav aria-label="관리자 메뉴">
-        <a className="ons-admin-nav-item" href="/admin" aria-current="page"><ClipboardCheck size={19} aria-hidden="true" />구매 인증</a>
+        <a className="ons-admin-nav-item" href="/admin" aria-current={showStatistics ? undefined : 'page'}><ClipboardCheck size={19} aria-hidden="true" />구매 인증</a>
+        <a className="ons-admin-nav-item" href="/admin?view=statistics" aria-current={showStatistics ? 'page' : undefined}><ChartNoAxesColumnIncreasing size={19} aria-hidden="true" />문항 분석</a>
       </nav>
       <nav aria-label="서비스 바로가기" className="ons-admin-shortcuts">
         <a className="ons-admin-nav-item" href="/account"><UserRound size={18} aria-hidden="true" />회원 화면<ArrowUpRight size={14} aria-hidden="true" /></a>
@@ -129,8 +133,8 @@ export function PurchaseAdminPage() {
       </header>
       <main className="ons-purchase-admin">
         <header className="ons-admin-title">
-          <span className="ons-admin-title-icon"><ClipboardCheck size={27} aria-hidden="true" /></span>
-          <div><h1>교재 구매 인증</h1><p>신청을 검토하고 회원의 1회용 티켓을 관리합니다.</p></div>
+          <span className="ons-admin-title-icon">{showStatistics ? <ChartNoAxesColumnIncreasing size={27} aria-hidden="true" /> : <ClipboardCheck size={27} aria-hidden="true" />}</span>
+          <div><h1>{showStatistics ? '문항 분석' : '교재 구매 인증'}</h1><p>{showStatistics ? '기본 OX의 최초·반복 성적과 집계 상태를 확인합니다.' : '신청을 검토하고 회원의 1회용 티켓을 관리합니다.'}</p></div>
         </header>
         {error && <p className="ons-error" role="alert">{error}</p>}
         {session === undefined && !error && <p role="status">관리자 상태를 확인하고 있습니다.</p>}
@@ -147,7 +151,8 @@ export function PurchaseAdminPage() {
         </form>}
         {session === null && !canVerify && <a href="/account" className="ons-button"><ShieldCheck size={17} aria-hidden="true" />관리자 계정으로 로그인</a>}
         {session && !session.admin && <p role="status">관리자 권한이 필요합니다.</p>}
-        {ready && <PurchaseQueueView queue={queue} busy={busy} page={page} filter={filter} query={query}
+        {ready && showStatistics && <Suspense fallback={<p role="status">문항 분석을 불러오는 중입니다.</p>}><StudyStatisticsAdmin /></Suspense>}
+        {ready && !showStatistics && <PurchaseQueueView queue={queue} busy={busy} page={page} filter={filter} query={query}
           onFilter={(value) => { setPage(1); setFilter(value) }} onSearch={(value) => { setPage(1); setQuery(value) }}
           onPage={setPage} onRefresh={() => void run(loadQueue)} onOpen={(row, event) => { opener.current = event.currentTarget; setSelected(row) }} />}
       </main>

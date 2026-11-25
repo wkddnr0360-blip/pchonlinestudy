@@ -3,6 +3,8 @@ import { fingerprintedAsset, publicAssetCacheControl } from '../shared/static-as
 import { accountRoutes } from './routes/account'
 import { legacyCacheRoute } from './routes/legacy-cache'
 import { purgeReviewedPhotos } from './jobs/purchase-photos'
+import { runStudyStatistics } from './analytics/job'
+import { statisticsCron } from './analytics/budget'
 
 export interface AppEnv {
   ONS_ENV: 'local' | 'staging' | 'production'
@@ -18,11 +20,15 @@ export interface AppEnv {
   LEGACY_PAGES_CACHE_MIGRATION?: string
   PURCHASE_TICKET_TTL_HOURS?: string
   PURCHASE_PHOTO_RETENTION_DAYS?: string
+  ANALYTICS_ENABLED?: string
+  ANALYTICS_ACCOUNT_ID?: string
+  ANALYTICS_METRICS_TOKEN?: string
 }
 
 export default {
   async scheduled(event, env) {
-    await purgeReviewedPhotos(env, event.scheduledTime)
+    if (event.cron === statisticsCron) await runStudyStatistics(env, event.scheduledTime)
+    else await purgeReviewedPhotos(env, event.scheduledTime)
   },
   async fetch(request, env) {
     const url = new URL(request.url)

@@ -313,6 +313,13 @@ test('a verified member submits a private photo; an MFA admin issues and retires
   assert.deepEqual(await proof.json(), { ok: true, adminMfa: true })
   adminCookie = cookieFrom(proof, 'session_token')
   assert.equal((await requestQueue(adminCookie)).status, 200)
+  const analysis = await api('/admin/study-statistics?stage=1&page=1', { cookie: adminCookie })
+  assert.equal(analysis.status, 200)
+  assert.deepEqual((await analysis.json()).boundaries, [90, 75, 50, 30])
+  const difficultyPath = '/admin/study-statistics/difficulty'
+  assert.equal((await api(difficultyPath, { cookie: adminCookie, body: { boundaries: [75, 90, 50, 30] } })).status, 400)
+  assert.equal((await api(difficultyPath, { cookie: adminCookie, body: { boundaries: [92, 75, 50, 30] } })).status, 200)
+  assert.ok(await env.DB.prepare("SELECT 1 FROM audit_events WHERE action = 'study_difficulty_updated'").first())
 
   const jpeg = encode({ width: 200, height: 200, data: Buffer.alloc(200 * 200 * 4, 128) }, 75).data
   const embedded = Buffer.from('fixture-photo-metadata', 'utf8')
@@ -418,4 +425,104 @@ test('a verified member submits a private photo; an MFA admin issues and retires
   assert.equal((await requestQueue(adminCookie)).status, 403)
   await env.DB.prepare('DELETE FROM member_roles WHERE user_id = ?').bind(session.user.id).run()
   assert.equal((await requestQueue(adminCookie)).status, 403)
+})
+
+test('basic OX statistics survive retries, validate cohorts, and resume after the daily budget resets', async () => {
+  const password = 'Synthetic statistics member password!'
+  const email = 'analytics-member@example.test'
+  assert.equal((await signup(email, password)).status, 200)
+  assert.equal((await verifyEmail(email)).status, 302)
+  const cookie = await signIn(email, password)
+  const { user } = await (await api('/session', { cookie })).json()
+  const questionPath = '/study/questions/1'
+  const getQuestion = async () => (await (await api(questionPath + '?mode=basic', { cookie })).json()).question
+  const bodyFor = (question, choice) => ({
+    no: question.no, revision: question.revision, choice,
+    eventId: question.statisticsContext.eventId, statisticsProof: question.statisticsContext.proof,
+  })
+  const submit = (body) => api('/study/answers', { cookie, body })
+  const aggregate = async (time = Date.now()) => {
+    const event = { cron: '*/5 * * * *', scheduledTime: new Date(time) }
+    assert.equal((await worker.scheduled(event)).outcome, 'ok')
+  }
+  assert.equal((await api('/admin/study-statistics', { cookie })).status, 403)
+  const first = await getQuestion()
+  assert.ok(first.statisticsContext.proof)
+  assert.equal(first.statistics, undefined)
+  const { question: review } = await (await api(questionPath, { cookie })).json()
+  assert.equal(review.statisticsContext, undefined)
+  const answer = await env.DB.prepare('SELECT answer FROM question_revisions WHERE no = 1 AND revision = 1').first('answer')
+  const wrong = answer === 'O' ? 'X' : 'O'
+  const firstBody = bodyFor(first, wrong)
+  const submissions = await Promise.all([submit(firstBody), submit(firstBody)])
+  assert.deepEqual(submissions.map((response) => response.status), [200, 200])
+  const { result } = await submissions[0].json()
+  assert.equal(result.correct, false)
+  assert.equal(result.statistics.sample, null)
+  assert.equal(result.statistics.mine.wrong, 1)
+  assert.deepEqual((await (await api('/study/recommendations?stage=1', { cookie })).json()).numbers, [1])
+
+  assert.equal((await submit(bodyFor(await getQuestion(), answer))).status, 200)
+  assert.equal((await submit({ ...firstBody, eventId: randomUUID() })).status, 200)
+  const rowsForMember = (await env.DB.prepare('SELECT statistics_first AS first FROM study_attempts WHERE user_id = ? ORDER BY rowid')
+    .bind(user.id).all()).results
+  assert.deepEqual(rowsForMember.map(({ first }) => first), [1, 0, null])
+  await Promise.all([aggregate(), aggregate()])
+  const counts = () => env.DB.prepare('SELECT first_wrong AS firstWrong, repeat_correct AS repeatCorrect FROM study_statistics WHERE no = 1 AND statistics_version = 1').first()
+  assert.deepEqual(await counts(), { firstWrong: 1, repeatCorrect: 1 })
+
+  const now = Date.now()
+  const day = Math.floor(now / 86_400_000)
+  await env.DB.prepare('UPDATE study_statistics_job SET day = ?, writes = 9999 WHERE id = 1').bind(day).run()
+  const delayed = bodyFor(await getQuestion(), answer)
+  assert.equal((await submit(delayed)).status, 200)
+  await aggregate(now)
+  assert.deepEqual(await counts(), { firstWrong: 1, repeatCorrect: 1 })
+  assert.equal(await env.DB.prepare('SELECT status FROM study_statistics_job WHERE id = 1').first('status'), 'paused')
+  await aggregate((day + 1) * 86_400_000)
+  assert.deepEqual(await counts(), { firstWrong: 1, repeatCorrect: 2 })
+
+  const stale = await getQuestion()
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO question_revisions (no, revision, prompt, source, answer, marker, explanation)
+      SELECT no, 2, prompt, source, answer, marker, explanation FROM question_revisions WHERE no = 1 AND revision = 1`),
+    env.DB.prepare('INSERT INTO study_statistics_versions (no, revision, statistics_version) VALUES (1, 2, 1)'),
+    env.DB.prepare('UPDATE book_questions SET active_revision = 2 WHERE no = 1'),
+  ])
+  assert.equal((await submit(bodyFor(stale, answer))).status, 409)
+  assert.equal((await submit(bodyFor(await getQuestion(), answer))).status, 200)
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO question_revisions (no, revision, prompt, source, answer, marker, explanation)
+      SELECT no, 3, prompt, source, ?, CASE WHEN ? = 'O' THEN '[○]' ELSE '[×]' END, explanation
+      FROM question_revisions WHERE no = 1 AND revision = 2`).bind(wrong, wrong),
+    env.DB.prepare('UPDATE book_questions SET active_revision = 3 WHERE no = 1'),
+  ])
+  assert.equal((await submit(bodyFor(await getQuestion(), wrong))).status, 200)
+  await aggregate((day + 1) * 86_400_000 + 300_000)
+  assert.deepEqual(await counts(), { firstWrong: 1, repeatCorrect: 3 })
+  assert.equal(await env.DB.prepare('SELECT first_correct FROM study_statistics WHERE no = 1 AND statistics_version = 3').first('first_correct'), 1)
+  const seedFirstAttempts = async (start, end) => {
+    await env.DB.batch([
+      env.DB.prepare(`WITH RECURSIVE seq(i) AS (SELECT ? UNION ALL SELECT i + 1 FROM seq WHERE i < ?)
+        INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        SELECT 'stats-fixture-' || i, 'Fixture', 'stats-fixture-' || i || '@example.test', 1, 1, 1 FROM seq`).bind(start, end),
+      env.DB.prepare(`WITH RECURSIVE seq(i) AS (SELECT ? UNION ALL SELECT i + 1 FROM seq WHERE i < ?)
+        INSERT INTO study_attempts (user_id, event_id, kind, no, choice, revision, is_correct, occurred_at, received_at, statistics_version, statistics_first, elapsed_ms)
+        SELECT 'stats-fixture-' || i, 'fixture', 'study', 1, ?, 3, 0, ?, ?, 3, 1, 2000 FROM seq`).bind(start, end, answer, now, now),
+    ])
+  }
+  const published = async () => (await (await submit(bodyFor(await getQuestion(), wrong))).json()).result.statistics
+  await seedFirstAttempts(1, 8)
+  await aggregate((day + 1) * 86_400_000 + 600_000)
+  assert.equal((await published()).sample, null)
+  await seedFirstAttempts(9, 9)
+  await aggregate((day + 1) * 86_400_000 + 900_000)
+  const ten = await published()
+  assert.equal(ten.sample, 10)
+  assert.equal(ten.firstAccuracy, 10)
+  assert.equal(ten.difficulty, null)
+  await seedFirstAttempts(10, 29)
+  await aggregate((day + 1) * 86_400_000 + 1_200_000)
+  assert.equal((await published()).difficulty, '매우 어려움')
+  assert.deepEqual((await (await api('/study/recommendations?stage=1&mode=common', { cookie })).json()).numbers, [1])
 })

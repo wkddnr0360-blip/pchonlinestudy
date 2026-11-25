@@ -23,6 +23,7 @@ jobs:
       - run: npm ci
       - run: test -z "$(git ls-files -- public/book/)"
       - run: npm test
+      - run: npm run verify:ons2:statistics-schema
       - run: npm run build:ons2
       - run: npm run test:ons2:runtime
       - run: npx playwright install --with-deps chromium webkit
