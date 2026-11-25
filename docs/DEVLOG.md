@@ -1,5 +1,11 @@
 # 개발 기록
 
+## 2026-11-26 · 온스 2.0 외부 스테이징 첫 배포
+
+- `9fa2ce2`를 Cloudflare `pch-ons2-staging` Worker와 별도 D1에 배포했다. 배포 버전은 `d9e3fddf`다. 앱에는 D1·Static Assets와 스테이징 세션 키가 연결됐고 승인 사진 정리 예약은 매시간 등록됐다. 스테이징 URL과 콜백 주소를 `docs/ONS2-STAGING.md`에 기록했다.
+- 처음에는 계정의 `workers.dev` 하위 도메인이 없어 Cloudflare가 Cron 등록을 거부했다. 대시보드에서 주소 생성 후 다시 배포했다. 새 주소의 초기 TLS 오류가 해소된 뒤 홈 및 계정·학습·관리자·시험 화면과 상태 API 응답을 확인했다. 브라우저에서 3단계 홈과 패치노트, 외부 HTTP 요청에서 비로그인 API 401, 과거 교재 JSON 경로 404, 자산의 `immutable`과 조건부 304를 확인했다.
+- 빌드와 정적 자산 27개 검증을 다시 통과했다. 외부 스테이징에 문항·회원·사진은 각각 0건이다. 기존 운영 Pages는 200으로 응답했다. 실제 교재 검증·적재, Google·이메일 로그인 및 구매·티켓 실환경 검증과 운영 전환은 대기 중이다.
+
 ## 2026-11-26 · 구매 사진 D1 전환과 자동 압축
 
 - `src/features/auth/{PurchaseForm.tsx,purchase-photo.ts}`와 `shared/purchase.ts`에서 브라우저가 열 수 있는 사진을 JPEG로 변환한다. 화질을 먼저 조정하고 필요하면 해상도를 낮춰 512 KiB 이내로 제한한다. HEIC/HEIF를 열 수 없는 브라우저에는 JPEG·PNG 안내를 표시한다. 기존 Worker의 JPEG 재인코딩은 일부 카메라 크기의 합성 이미지에서 디코더 메모리 제한을 넘었다. `worker/services/purchase-photo-jpeg.ts`는 JPEG 구조와 크기를 검사하고 EXIF 등 메타데이터 구간을 제거한다.
