@@ -1,5 +1,5 @@
 import type { ExplanationBlock, Ox, Stage } from '../../src/book/types'
-import { questionId, type LegacyAttempt, type StudyProgress, type StudyQuestion, type StudyResult } from '../../shared/study'
+import { questionId, type LegacyAttempt, type StudyIndexEntry, type StudyOutlineLabel, type StudyProgress, type StudyQuestion, type StudyResult } from '../../shared/study'
 
 export type StageLimit = 1 | 3
 
@@ -16,9 +16,11 @@ export async function withinStudyLimit(db: D1Database, userId: string, action: s
 }
 
 export async function studyCatalog(db: D1Database, maxStage: StageLimit) {
-  const { results } = await db.prepare('SELECT no, stage FROM book_questions WHERE stage <= ? ORDER BY no')
-    .bind(maxStage).all<{ no: number; stage: Stage }>()
-  return results
+  const [questions, outline] = await db.batch([
+    db.prepare('SELECT no, stage, part, chapter, section FROM book_questions WHERE stage <= ? ORDER BY no').bind(maxStage),
+    db.prepare('SELECT stage, part, chapter, section, label, printed_page AS printedPage FROM book_outline WHERE stage <= ? ORDER BY stage, part, chapter, section').bind(maxStage),
+  ])
+  return { questions: questions.results as StudyIndexEntry[], outline: outline.results as StudyOutlineLabel[] }
 }
 
 export async function readStudyQuestion(db: D1Database, no: number, maxStage: StageLimit): Promise<StudyQuestion | null> {

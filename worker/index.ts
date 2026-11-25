@@ -1,5 +1,5 @@
 import { json } from './http'
-import { fingerprintedAsset } from '../shared/static-assets'
+import { fingerprintedAsset, publicAssetCacheControl } from '../shared/static-assets'
 import { accountRoutes } from './routes/account'
 import { legacyCacheRoute } from './routes/legacy-cache'
 import { purgeReviewedPhotos } from './jobs/purchase-photos'
@@ -42,12 +42,12 @@ export default {
     const migration = await legacyCacheRoute(request, env, url)
     if (migration) return migration
 
-    const isShell = ['/', '/account', '/admin', '/study'].includes(url.pathname)
+    const isShell = ['/', '/account', '/admin', '/study', '/exam'].includes(url.pathname)
     if (!read || (!isShell && !fingerprintedAsset.test(url.pathname.slice(1)))) {
       return json({ error: 'not_found' }, 404, method)
     }
 
-    const assetRequest = isShell ? new Request(new URL('/', url), { method }) : request
+    const assetRequest = isShell ? new Request(new URL('/index.html', url), { method }) : request
     const asset = await env.ASSETS.fetch(assetRequest)
     if (asset.status >= 400) return json({ error: 'not_found' }, 404, method)
 
@@ -56,12 +56,13 @@ export default {
     response.headers.set('X-Robots-Tag', 'noindex, nofollow')
     if (isShell) {
       response.headers.set('Cache-Control', 'no-store')
+      response.headers.set('Cloudflare-CDN-Cache-Control', 'no-store')
       response.headers.set('Referrer-Policy', 'no-referrer')
       response.headers.set('Content-Security-Policy', [
         "default-src 'self'", "img-src 'self' blob:", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'",
       ].join('; '))
     } else if (asset.status === 200 || asset.status === 304) {
-      response.headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+      response.headers.set('Cache-Control', publicAssetCacheControl)
     }
     return response
   },

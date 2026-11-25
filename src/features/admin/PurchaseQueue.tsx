@@ -69,9 +69,8 @@ export function PurchaseQueueView({ queue, busy, page, filter, query, onFilter, 
         </div>
         <div className="ons-admin-tools">
           <form key={query} className="ons-admin-search" onSubmit={submitSearch} role="search">
-            <Search size={17} aria-hidden="true" />
             <input name="query" type="search" maxLength={60} defaultValue={query} placeholder="카페 닉네임 검색" aria-label="카페 닉네임 검색" />
-            <button type="submit">검색</button>
+            <button type="submit" aria-label="검색" title="검색"><Search size={20} aria-hidden="true" /></button>
           </form>
           <label className="ons-admin-filter">
             <Filter size={16} aria-hidden="true" />

@@ -70,6 +70,7 @@ export async function adminPurchaseRoute(request: Request, env: AppEnv, url: URL
     const photo = await purchasePhoto(env.DB, env.PRIVATE_FILES, action[1], adminId)
     return photo ? new Response(photo.body, { headers: {
       'Content-Type': 'image/jpeg', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+      'Cloudflare-CDN-Cache-Control': 'no-store',
     } }) : json({ error: 'not_found' }, 404)
   }
   if (request.method !== 'POST') return json({ error: 'not_found' }, 404, request.method)

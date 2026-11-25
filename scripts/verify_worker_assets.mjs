@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { fingerprintedAsset } from '../shared/static-assets.ts'
+import { fingerprintedAsset, staticAssetHeaders } from '../shared/static-assets.ts'
 
 const client = fileURLToPath(new URL('../.ons2/client/', import.meta.url))
 const credential = /-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----|\b(?:github_pat_[A-Za-z0-9_]{36,}|gh[pousr]_[A-Za-z0-9]{36,}|GOCSPX-[A-Za-z0-9_-]{20,}|re_[A-Za-z0-9]{20,})\b/
@@ -16,7 +16,7 @@ async function verifyDirectory(directory, prefix = '') {
       count += await verifyDirectory(join(directory, entry.name), 'assets/')
       continue
     }
-    if (!entry.isFile() || (!['index.html', 'release.json'].includes(name) && !fingerprintedAsset.test(name))) {
+    if (!entry.isFile() || (!['index.html', 'release.json', '_headers'].includes(name) && !fingerprintedAsset.test(name))) {
       throw new Error(`Unexpected Workers static asset: ${name}`)
     }
     if (/\.(?:html|js|css)$/.test(name)) {
@@ -31,6 +31,8 @@ async function verifyDirectory(directory, prefix = '') {
 }
 
 const count = await verifyDirectory(client)
+const configuredHeaders = await readFile(join(client, '_headers'), 'utf8')
+if (configuredHeaders !== staticAssetHeaders) throw new Error('Unexpected Cloudflare static asset cache rules.')
 const release = JSON.parse(await readFile(join(client, 'release.json'), 'utf8'))
 if (Object.keys(release).length !== 2 || !/^[a-f0-9-]{36}$/.test(release.id) || !Number.isSafeInteger(release.builtAt) || release.builtAt <= 0) {
   throw new Error('Invalid Workers release marker.')

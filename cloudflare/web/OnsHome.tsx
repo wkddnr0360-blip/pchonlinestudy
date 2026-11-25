@@ -1,35 +1,53 @@
-import { ArrowDown, ArrowRight, BookOpen, Camera, CircleCheck, TicketCheck, UserRoundPlus } from 'lucide-react'
-import { AccountArtwork } from '../../src/features/auth/AccountArtwork'
+import { ArrowRight, BookOpen, NotebookPen, RotateCcw, TicketCheck, Timer } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import type { Stage } from '../../src/book/types'
+import type { StudyCatalog, StudyProgress } from '../../shared/study'
+import { StageGallery } from '../../src/features/study/StageGallery'
+import { studyRequest } from '../../src/features/study/api'
+import { reviewHref } from '../../src/features/study/navigation'
+import fontLicense from '../../src/ui/licenses/SUIT-OFL.txt?url'
 import './home.css'
 
-const steps = [
-  { title: '계정 만들기', detail: '이메일이나 Google 계정으로 시작합니다.', icon: UserRoundPlus, tone: 'lilac' },
-  { title: '교재 사진 제출', detail: '카페 닉네임을 적은 포스트잇과 교재를 촬영합니다.', icon: Camera, tone: 'mint' },
-  { title: '황금 티켓 사용', detail: '심사 후 받은 1회용 티켓으로 정회원 이용권을 엽니다.', icon: TicketCheck, tone: 'gold' },
-] as const
-
 export function OnsHome() {
-  return <main className="ons-home">
-    <section className="ons-home-hero" aria-labelledby="ons-home-heading">
-      <div className="ons-home-copy">
-        <h1 id="ons-home-heading">경찰헌법 OX 학습<span>박철한 온스</span></h1>
-        <p>내 계정에서 교재 구매를 인증하고 정회원 이용권을 준비하세요.</p>
-        <div className="ons-home-actions">
-          <a className="ons-button" href="/study"><BookOpen size={18} aria-hidden="true" />OX 학습 시작</a>
-          <a className="ons-home-guide" href="/account">로그인 및 회원가입<ArrowRight size={16} aria-hidden="true" /></a>
-          <a className="ons-home-guide" href="#book-access">교재 인증 안내<ArrowDown size={16} aria-hidden="true" /></a>
-        </div>
+  const [study, setStudy] = useState<{ catalog: StudyCatalog; progress: StudyProgress }>()
+  useEffect(() => {
+    const controller = new AbortController()
+    const options = { signal: controller.signal }
+    void Promise.all([
+      studyRequest<StudyCatalog>('/study/catalog', options), studyRequest<{ progress: StudyProgress }>('/study/progress', options),
+    ]).then(([catalog, { progress }]) => setStudy({ catalog, progress })).catch(() => {})
+    return () => controller.abort()
+  }, [])
+
+  const counts: Partial<Record<Stage, number>> = {}
+  for (const { stage } of study?.catalog.questions ?? []) counts[stage] = (counts[stage] ?? 0) + 1
+  const recent = study?.progress.lastNo && study.catalog.questions.find(({ no }) => no === study.progress.lastNo)
+
+  return <main className="ons-home ons-container">
+    <header className="ons-home-intro">
+      <p><BookOpen size={17} aria-hidden="true" /> 경찰헌법 OX</p>
+      <h1>헌법의 핵심은<br className="ons-home-break" /> 무한회독</h1>
+      <p className="ons-home-subtitle">교재의 1단계부터 고득점 도전까지.</p>
+    </header>
+    <StageGallery verified={study?.catalog.access.bookVerified ?? false} counts={counts} />
+    <section className="ons-home-activity" aria-labelledby="ons-activity-heading">
+      <h2 id="ons-activity-heading">실전과 복습</h2>
+      <div className="ons-home-shortcuts">
+        {recent && <a className="ons-home-row" href={`/study?stage=${recent.stage}`}>
+          <span className="ons-home-row-icon ons-home-row-green"><RotateCcw size={22} aria-hidden="true" /></span>
+          <span><strong>이어 풀기</strong><small>교재 {recent.no}번</small></span><ArrowRight size={19} aria-hidden="true" />
+        </a>}
+        <a className="ons-home-row" href="/exam">
+          <span className="ons-home-row-icon"><Timer size={22} aria-hidden="true" /></span>
+          <span><strong>실전 모의고사</strong><small>4지선다 20문항 · 기본 20분</small></span><ArrowRight size={19} aria-hidden="true" />
+        </a>
+        <a className="ons-home-row" href={reviewHref}>
+          <span className="ons-home-row-icon ons-home-row-gold"><NotebookPen size={22} aria-hidden="true" /></span>
+          <span><strong>오답노트</strong><small>틀린 문제 다시 풀기</small></span><ArrowRight size={19} aria-hidden="true" />
+        </a>
       </div>
-      <div className="ons-home-visual"><AccountArtwork stage={2} /></div>
     </section>
-    <section id="book-access" className="ons-home-steps" aria-labelledby="ons-home-steps-title">
-      <h2 id="ons-home-steps-title"><CircleCheck size={23} aria-hidden="true" />교재 인증 방법</h2>
-      <ol>
-        {steps.map(({ title, detail, icon: Icon, tone }) => <li key={title}>
-          <span className={`ons-step-icon ons-step-${tone}`}><Icon size={23} aria-hidden="true" /></span>
-          <div><h3>{title}</h3><p>{detail}</p></div>
-        </li>)}
-      </ol>
-    </section>
+    <a href="/account" className="ons-home-access"><TicketCheck size={19} aria-hidden="true" /> 교재 인증 및 황금 티켓 <ArrowRight size={16} aria-hidden="true" /></a>
+    <footer className="ons-home-footer"><a href={fontLicense}>글꼴 라이선스</a></footer>
   </main>
 }

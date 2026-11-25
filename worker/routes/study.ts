@@ -29,7 +29,7 @@ export async function studyRoute(request: Request, db: D1Database, url: URL, use
   const maxStage = access.bookVerified ? 3 : 1
 
   if (method === 'GET' && path === 'catalog') {
-    return json({ questions: await studyCatalog(db, maxStage), access }, 200)
+    return json({ ...await studyCatalog(db, maxStage), access }, 200)
   }
   if (method === 'GET' && path === 'progress') {
     return json({ progress: await studyProgress(db, userId, maxStage) }, 200)

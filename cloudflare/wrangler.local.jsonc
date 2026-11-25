@@ -15,7 +15,8 @@
   "assets": {
     "directory": "../.ons2/client",
     "binding": "ASSETS",
-    "run_worker_first": true,
+    "run_worker_first": ["/", "/index.html", "/release.json", "/api/*"],
+    "html_handling": "none",
     "not_found_handling": "none"
   },
   "d1_databases": [{

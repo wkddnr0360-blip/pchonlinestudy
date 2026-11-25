@@ -58,7 +58,7 @@
 .ons-tone-neutral { color: #56586a; background: #eeeff4; }
 .ons-request-rejected { color: #9e3b4b; background: #ffe8ec; }
 
-.ons-admin-list { overflow: hidden; border: 1px solid #e5e2ef; border-radius: 1.15rem; background: #fff; box-shadow: 0 12px 36px -28px #261e4b56; }
+.ons-admin-list { overflow: hidden; border: 1px solid var(--ons-rule); border-radius: var(--ons-radius); background: var(--ons-surface); box-shadow: var(--ons-shadow); }
 .ons-admin-list-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; flex-wrap: wrap; padding: 1.15rem; }
 .ons-admin-list h2 { margin: 0; font-size: 1.13rem; }
 .ons-admin-list p { margin: 0.15rem 0 0; color: #656176; font-size: 0.85rem; }
@@ -68,7 +68,7 @@
 .ons-admin-search input, .ons-admin-filter select { width: 100%; min-width: 0; min-height: 2.55rem; padding: 0.35rem 0.05rem; border: 0; outline: none; background: transparent; color: #29243b; font-size: 0.86rem; }
 .ons-admin-search:focus-within, .ons-admin-filter:focus-within { outline: 2px solid #6f5cce; outline-offset: 1px; }
 .ons-admin-search svg, .ons-admin-filter svg { flex: none; }
-.ons-admin-search button { flex: none; align-self: stretch; border: 0; background: transparent; color: #5541ab; cursor: pointer; font-size: 0.82rem; font-weight: 720; }
+.ons-admin-search button { flex: none; display: grid; place-items: center; align-self: stretch; min-width: 2.75rem; min-height: 2.75rem; border: 0; border-radius: 0.62rem; background: transparent; color: var(--ons-blue-hover); cursor: pointer; }
 
 .ons-admin-icon-button, .ons-admin-action { display: inline-flex; align-items: center; justify-content: center; gap: 0.43rem; min-height: 2.75rem; border: 1px solid #ddd7ed; border-radius: 0.62rem; background: #fff; color: #534969; cursor: pointer; font-size: 0.875rem; font-weight: 660; }
 .ons-admin-icon-button { width: 2.75rem; flex: none; padding: 0; }

@@ -1,5 +1,28 @@
 import type { ExplanationBlock, Ox, Question, Stage } from '../src/book/types'
 
+export interface StudyCatalog {
+  questions: StudyIndexEntry[]
+  outline: StudyOutlineLabel[]
+  access: { bookVerified: boolean }
+}
+
+export interface StudyIndexEntry {
+  no: number
+  stage: Stage
+  part: number
+  chapter: number
+  section: number | null
+}
+
+export interface StudyOutlineLabel {
+  stage: Stage
+  part: number
+  chapter: number
+  section: number
+  label: string
+  printedPage: number | null
+}
+
 export interface StudyQuestion {
   id: string
   no: number

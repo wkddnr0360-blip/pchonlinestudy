@@ -1,5 +1,14 @@
 # 개발 기록
 
+## 2026-11-26 · 3단계 홈·계층형 목차·서버 모의고사
+
+- `cloudflare/web/`에서 이전 홈의 민트·블루·라벤더 색상과 3종 철한쌤 포즈를 복원하고 작은 서재 도트를 더했다. 상단 패치노트, 모바일 아이콘 탐색, 읽기 상태를 연결했다. UI 공통 서체는 SUIT Variable WOFF2로 배포하며 OFL 원문을 함께 제공한다. 잠금 안내, 학습 설정 및 관리자 상세에는 Radix Dialog, 학습 방식에는 Radix Radio Group, 메뉴와 동작에는 Lucide를 적용했다. [이전 홈 색상](https://github.com/wkddnr0360-blip/pchonlinestudy/blob/main/src/app/home.css) · [SUIT](https://github.com/sun-typeface/SUIT) · [Radix](https://github.com/radix-ui/primitives) · [Lucide](https://github.com/lucide-icons/lucide)
+- `src/features/study/`에서 첨부 화면의 편별 흰 카드, 우측 문항 수와 화살표, 절 들여쓰기를 적용했다. 목차 행을 누르면 순서·랜덤·번호 지정이 모바일 하단 시트 또는 데스크톱 대화상자로 열린다. OX 풀이와 결과는 별도 화면이고, 기출 출처와 해설 표를 보존한다. 오답노트는 메뉴로 열고, 기존 OX 진도 이관은 계정에서 확인한다. 브라우저에서 번호 지정, 포커스, 패치노트, 티켓과 이관을 검증했다. [이전 단계 화면](https://github.com/wkddnr0360-blip/pchonlinestudy/blob/main/src/study/StagePage.tsx)
+- `migrations/0006_book_outline.sql`과 `scripts/prepare_ons2_book.mjs`는 기존 정규화 파일의 정확한 편·장·절 이름, 쪽수, 문항 식별자, 지문, 출처, 정오 표식과 해설을 비공개 D1 형식으로 연결한다. 합성 3,129문항을 SQLite에 넣어 쪽수·줄바꿈·출처·정오 표식·표를 대조했다. 과거 공개판에서 1단계 504문항 목차를 확인했다. 정규화된 전체 교재 내보내기는 이번 작업 공간에 존재하지 않아 실데이터 적재는 남아 있다. [기존 공개판](https://pch.oxstudy.kro.kr/)
+- `migrations/0007_mock_exam.sql`, `worker/{routes,services}/exams.ts`, `src/features/exam/`가 교재 인증 회원용 4지선다 20문항, 기본 20분과 사용자 시간 설정, 한 문항 단위 전송, 답안표, 만료 제출과 채점을 연결한다. 기존 교재 지문 조합기를 재사용한다. 문제에 참조한 리비전과 답안만 저장하고, 제출 후 해당 원문·출처·해설을 다시 조회한다. 실제 최신 기출과 출제 비율 대조는 후속 검증이다.
+- 해시 정적 자산은 Workers Static Assets의 계층형 캐시에서 제공한다. HTML·교재 API·구매 사진은 `no-store`를 적용한다. 공개 정적 자산에서 R2 읽기는 발생하지 않는다. 계정·학습·시험·관리자와 IndexedDB 이관 코드를 지연 로드한다. [Cloudflare Static Assets](https://developers.cloudflare.com/workers/static-assets/)
+- 단위 22개, Worker 8개, Chromium·WebKit 11개 및 정적 산출물 27개 검사를 실행했다. 캡처는 `.ons2/qa/home-390.png`, `.ons2/qa/home-1280.png`, `.ons2/qa/study-outline-320.png`, `.ons2/qa/exam-320.png`다. 운영 배포는 없다. UI 롤백은 기능 브랜치 커밋을 되돌리고, D1 스키마를 적용한 환경에서는 저장된 학습과 시험 기록을 보존한다.
+
 ## 2026-11-26 · P0-C OX 학습·진도와 Cloudflare 스테이징 기반
 
 - `migrations/0005_study.sql`, `shared/study.ts`, `worker/routes/study.ts`, `worker/services/study.ts` 및 계정 라우트에서 교재 번호, 불변 원문 리비전, 회원별 풀이를 연결했다. 매 요청에서 유효한 이용권을 확인한다. 제출 전에는 단일 문제의 지문과 출처를 보낸다. 정답과 해설은 제출 후 전달한다. 같은 풀이 요청의 중복 저장과 틀린 리비전 제출을 차단한다.

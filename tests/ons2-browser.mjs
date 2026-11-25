@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { after, before, beforeEach, test } from 'node:test'
@@ -57,19 +57,44 @@ test('a mobile learner solves one printed number and moves only allowlisted lega
     const authenticated = await page.request.post(baseURL + '/api/v1/auth/sign-in/email', { headers, data: { email, password } })
     assert.equal(authenticated.status(), 200)
 
-    await page.goto(baseURL + '/study')
-    await expect(page.getByRole('radio', { name: '2단계' })).toBeDisabled()
+    await page.goto(baseURL + '/study?stage=2')
+    await expect(page.getByRole('link', { name: '교재 인증', exact: true })).toBeVisible()
+    await page.goto(baseURL + '/study?stage=1')
+    await expect(page.getByRole('heading', { name: '교재 목차' })).toBeVisible()
+    await expect(page.getByText('제2편 합성 목차')).toBeVisible()
+    await expect(page.getByRole('radiogroup', { name: '학습 방식' })).toHaveCount(0)
+    await page.screenshot({ path: '.ons2/qa/study-outline-320.png', fullPage: true, animations: 'disabled' })
+    await page.getByRole('button', { name: /제1절 개념 확인/ }).click()
+    await expect(page.getByRole('dialog', { name: '학습 방식' })).toBeVisible()
+    await expect(page.getByText(/선택 범위 12문항/)).toBeVisible()
+    await page.getByRole('radio', { name: '순서대로' }).focus()
+    await page.keyboard.down('ArrowRight')
+    await expect(page.getByRole('radio', { name: '랜덤' })).toBeFocused()
+    await expect(page.getByRole('radio', { name: '랜덤' })).toBeChecked()
+    await page.keyboard.up('ArrowRight')
+    await page.keyboard.down('ArrowRight')
+    await expect(page.getByRole('radio', { name: '번호 지정' })).toBeChecked()
+    await page.keyboard.up('ArrowRight')
+    await page.screenshot({ path: '.ons2/qa/study-setup-320.png', fullPage: true, animations: 'disabled' })
     await page.getByRole('spinbutton', { name: '시작 번호', exact: true }).fill('2')
     await page.getByRole('button', { name: '1문제', exact: true }).click()
     await expect(page.getByLabel('끝 번호')).toHaveValue('2')
-    await page.getByRole('button', { name: '문제 열기' }).click()
+    await page.getByRole('button', { name: '문제 풀기' }).click()
     const question = page.getByRole('heading', { name: '교재 2번' })
     await expect(question).toBeFocused()
     await expect(page.getByRole('region', { name: '정답 및 해설' })).toHaveCount(0)
-    await page.getByRole('button', { name: 'X', exact: true }).click()
-    await expect(page.getByText('틀렸습니다. 내 답 X · 정답 O')).toBeVisible()
-    await page.getByRole('button', { name: '오답노트 열기' }).click()
-    await expect(page.getByRole('button', { name: '1단계 · 2번' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '문제 고르기' })).toHaveCount(0)
+    await page.screenshot({ path: '.ons2/qa/study-question-320.png', animations: 'disabled' })
+    await page.setViewportSize({ width: 1280, height: 820 })
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await page.screenshot({ path: '.ons2/qa/study-question-1280.png', animations: 'disabled' })
+    await page.setViewportSize({ width: 320, height: 850 })
+    await page.getByRole('button', { name: 'X 틀리다', exact: true }).click()
+    await expect(page.getByText('내 답 X · 정답 O')).toBeVisible()
+    await page.getByRole('button', { name: '학습 마치기' }).click()
+    await page.getByRole('link', { name: '오답노트', exact: true }).click()
+    await expect(page.getByRole('button', { name: '1단계 교재 2번' })).toBeVisible()
+    await page.getByRole('link', { name: '내 계정', exact: true }).click()
     await page.getByText('기존 OX 진도 가져오기', { exact: true }).click()
     const at = Date.now() - 60_000
     const attempts = [{ id: 'synthetic-session:1', no: 1, answer: 'X', at, correct: true }]
@@ -83,7 +108,32 @@ test('a mobile learner solves one printed number and moves only allowlisted lega
     assert.deepEqual(Object.keys(sent).sort(), ['accountId', 'attempts'])
     await expect(page.getByText('기존 OX 기록 1개를 가져왔습니다.')).toBeVisible()
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
-    await page.screenshot({ path: '.ons2/qa/study-320.png', fullPage: true, animations: 'disabled' })
+    await page.screenshot({ path: '.ons2/qa/legacy-import-320.png', fullPage: true, animations: 'disabled' })
+
+    const user = (await (await page.request.get(baseURL + '/api/v1/session')).json()).user
+    const requestId = randomUUID()
+    const codeId = randomUUID()
+    const code = randomBytes(16).toString('hex').toUpperCase()
+    const now = Date.now()
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO purchase_requests (id, user_id, campaign_id, cafe_nickname, status, submitted_at, reviewed_at) VALUES (?, ?, 'ons-season-5', '합성 시험', 'approved', ?, ?)").bind(requestId, user.id, now, now),
+      env.DB.prepare("INSERT INTO access_codes (id, request_id, user_id, campaign_id, code_hash, issued_at, expires_at) VALUES (?, ?, ?, 'ons-season-5', ?, ?, ?)").bind(codeId, requestId, user.id, createHash('sha256').update(code).digest('hex'), now, now + 60_000),
+    ])
+    assert.equal((await page.request.post(baseURL + '/api/v1/book-access/redeem', { data: { code }, headers })).status(), 200)
+    await page.goto(baseURL)
+    await expect(page.getByRole('link', { name: /3단계 고득점 도전/ })).toBeVisible()
+    await page.getByRole('link', { name: /실전 모의고사/ }).click()
+    await expect(page.getByLabel('제한 시간 (분)')).toHaveValue('20')
+    await page.getByRole('button', { name: '시험 시작' }).click()
+    const options = page.getByRole('group', { name: '보기' }).getByRole('button')
+    await expect(options).toHaveCount(4)
+    await expect(page.getByRole('timer', { name: '남은 시간' })).toBeVisible()
+    await options.first().click()
+    await expect(options.first()).toHaveAttribute('aria-pressed', 'true')
+    await page.screenshot({ path: '.ons2/qa/exam-320.png', fullPage: true, animations: 'disabled' })
+    await page.getByRole('button', { name: '시험 제출', exact: true }).click()
+    await page.getByRole('button', { name: '제출하고 결과 보기' }).click()
+    await expect(page.getByText(/교재 \d+번 · 출처 및 해설/)).toHaveCount(4)
   } finally { await page.close() }
 })
 
@@ -92,11 +142,25 @@ for (const width of [320, 390, 768, 1280]) {
     const page = await browser.newPage({ viewport: { width, height: 800 } })
     try {
       await page.goto(baseURL)
-      if (width === 1280) {
-        await page.getByRole('heading', { name: /경찰헌법 OX 학습/ }).waitFor()
-        await page.screenshot({ path: '.ons2/qa/home-1280.png', animations: 'disabled', fullPage: true })
+      await page.getByRole('heading', { name: /헌법의 핵심은/ }).waitFor()
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      if (width === 390 || width === 1280) {
+        await page.evaluate(() => document.fonts.ready.then(() => true))
+        await page.screenshot({ path: `.ons2/qa/home-${width}.png`, animations: 'disabled', fullPage: width === 1280 })
       }
-      await page.getByRole('link', { name: '로그인 및 회원가입' }).click()
+      if (width === 390) {
+        const locked = page.getByRole('button', { name: /2단계 실전 감각/ })
+        await locked.focus()
+        await page.keyboard.press('Enter')
+        await expect(page.getByRole('dialog', { name: '2단계 실전 감각' })).toBeVisible()
+        await page.keyboard.press('Escape')
+        await expect(locked).toBeFocused()
+        await page.getByRole('button', { name: '패치노트 · 새 소식' }).click()
+        await expect(page.getByRole('dialog', { name: '패치노트' })).toBeVisible()
+        await page.keyboard.press('Escape')
+        await expect(page.getByRole('button', { name: '패치노트', exact: true })).toBeFocused()
+      }
+      await page.getByRole('link', { name: '내 계정', exact: true }).click()
       await page.getByRole('heading', { name: '로그인', exact: true }).waitFor()
       const email = page.getByRole('textbox', { name: '이메일' })
       const google = page.getByRole('button', { name: 'Google로 로그인' })
@@ -354,7 +418,7 @@ test('a cached Pages tab can open Workers and retire its old shell without clear
 
     const retryPage = await context.newPage()
     await retryPage.goto(origin + '/?ons-retry=1')
-    await retryPage.getByRole('link', { name: '로그인 및 회원가입' }).waitFor()
+    await retryPage.getByRole('link', { name: '내 계정', exact: true }).waitFor()
     await retryPage.close()
 
     await page.evaluate(async () => {
@@ -371,7 +435,7 @@ test('a cached Pages tab can open Workers and retire its old shell without clear
     })
     await page.waitForFunction(async () => !await navigator.serviceWorker.getRegistration())
     await page.goto(origin)
-    await page.getByRole('link', { name: '로그인 및 회원가입' }).waitFor()
+    await page.getByRole('link', { name: '내 계정', exact: true }).waitFor()
 
     const preserved = await page.evaluate(async () => ({
       cacheNames: await caches.keys(),

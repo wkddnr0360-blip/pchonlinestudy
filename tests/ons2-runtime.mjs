@@ -16,6 +16,7 @@ test('the shell and its scripts load through the Worker', async () => {
   const shell = await harness.fetch('/')
   assert.equal(shell.status, 200)
   assert.equal(shell.headers.get('Cache-Control'), 'no-store')
+  assert.equal(shell.headers.get('Cloudflare-CDN-Cache-Control'), 'no-store')
   assert.match(shell.headers.get('Content-Security-Policy'), /frame-ancestors 'none'/)
   const html = await shell.text()
   assert.match(html, /박철한 온스 2\.0/)
@@ -24,11 +25,16 @@ test('the shell and its scripts load through the Worker', async () => {
   assert.equal(script.status, 200)
   assert.match(script.headers.get('Content-Type'), /javascript/)
   assert.equal(script.headers.get('Cache-Control'), 'public, max-age=31536000, immutable')
+  assert.equal(script.headers.get('X-Content-Type-Options'), 'nosniff')
+  assert.ok(script.headers.get('ETag'))
   await script.arrayBuffer()
+  const cached = await harness.fetch(source, { headers: { 'If-None-Match': script.headers.get('ETag') } })
+  assert.equal(cached.status, 304)
+  assert.equal(cached.headers.get('Cache-Control'), 'public, max-age=31536000, immutable')
 })
 
 test('legacy files, private objects and unknown API paths cannot fall through to assets', async () => {
-  for (const path of ['/book/manifest.json', '/book/0123456789abcdef/2-1-1.json', '/%62ook/manifest.json', '/sw.js', '/release.json', '/api/v1/questions', '/assets/missing-abcdef12.js']) {
+  for (const path of ['/book/manifest.json', '/book/0123456789abcdef/2-1-1.json', '/%62ook/manifest.json', '/sw.js', '/release.json', '/index.html', '/_headers', '/api/v1/questions', '/assets/missing-abcdef12.js']) {
     const response = await harness.fetch(path)
     assert.equal(response.status, 404, path)
     assert.equal(response.headers.get('Cache-Control'), 'private, no-store', path)
@@ -36,6 +42,7 @@ test('legacy files, private objects and unknown API paths cannot fall through to
   }
   const response = await harness.fetch('/api/v1/session')
   assert.equal(response.status, 401)
+  assert.equal(response.headers.get('Cloudflare-CDN-Cache-Control'), 'no-store')
   assert.deepEqual(await response.json(), { error: 'login_required' })
 })
 

@@ -2,11 +2,15 @@ import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import react from '@vitejs/plugin-react'
 import { defineConfig, normalizePath } from 'vite'
+import { staticAssetHeaders } from '../shared/static-assets'
 
 const root = fileURLToPath(new URL('./web/', import.meta.url))
 const project = normalizePath(fileURLToPath(new URL('../', import.meta.url)))
 const privateRoots = ['public/', 'tests/', 'fixtures/', 'worker/'].map((directory) => project + directory)
-const approvedBrandAssets = new Set(['public/characters/teacher.webp', 'public/icons/ons-192.png'].map((path) => project + path))
+const approvedBrandAssets = new Set([
+  'public/characters/teacher.webp', 'public/characters/teacher-reactions.webp',
+  'public/challenge/archive-scenes.webp', 'public/icons/ons-192.png',
+].map((path) => project + path))
 
 export default defineConfig({
   root,
@@ -27,6 +31,7 @@ export default defineConfig({
           }
         }
         this.emitFile({ type: 'asset', fileName: 'release.json', source: JSON.stringify({ id: randomUUID(), builtAt: Date.now() }) })
+        this.emitFile({ type: 'asset', fileName: '_headers', source: staticAssetHeaders })
       },
     },
   ],

@@ -4,6 +4,7 @@ export function json(data: unknown, status: number, method = 'GET'): Response {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'private, no-store',
+      'Cloudflare-CDN-Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
       'X-Robots-Tag': 'noindex, nofollow',
     },
@@ -13,6 +14,7 @@ export function json(data: unknown, status: number, method = 'GET'): Response {
 export function privateHeaders(response: Response) {
   const headers = new Headers(response.headers)
   headers.set('Cache-Control', 'private, no-store')
+  headers.set('Cloudflare-CDN-Cache-Control', 'no-store')
   headers.set('Referrer-Policy', 'no-referrer')
   headers.set('X-Content-Type-Options', 'nosniff')
   headers.set('X-Robots-Tag', 'noindex, nofollow')

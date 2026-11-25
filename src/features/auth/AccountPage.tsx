@@ -3,13 +3,15 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AccountArtwork } from './AccountArtwork'
 import { TicketArt } from './TicketArt'
 import { PurchaseForm } from './PurchaseForm'
+import { LegacyImport } from '../study/LegacyImport'
+import { studyReturnFromQuery } from '../study/navigation'
 import googleMark from './google-g.png'
 import './account.css'
 
 type Mode = 'signin' | 'signup' | 'verify' | 'forgot' | 'reset'
 type Methods = { email: boolean; google: boolean }
 type Account = {
-  user: { email: string; name: string }
+  user: { id: string; email: string; name: string }
   access: { bookVerified: boolean; expiresAt: number | null }
   admin?: { mfaEnabled: boolean; mfaFresh: boolean } | null
 }
@@ -48,6 +50,12 @@ const authActions = {
 const expiryDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeZone: 'Asia/Seoul' })
 
 export function AccountPage() {
+  const [studyTarget] = useState(() => {
+    const params = new URLSearchParams(location.search)
+    const href = studyReturnFromQuery(params)
+    return href ? { href, key: params.get('study')! } : null
+  })
+  const accountCallback = location.origin + '/account' + (studyTarget ? '?study=' + encodeURIComponent(studyTarget.key) : '')
   const [resetToken] = useState(() => new URLSearchParams(location.search).get('token'))
   const [mode, setMode] = useState<Mode>(resetToken ? 'reset' : 'signin')
   const [methods, setMethods] = useState<Methods | null>(null)
@@ -105,10 +113,10 @@ export function AccountPage() {
     const form = new FormData(event.currentTarget)
     const email = form.get('email')
     const password = form.get('password')
-    const callbackURL = location.origin + '/account'
+    const callbackURL = accountCallback
     const args = {
       signin: { email, password }, signup: { email, password, name: form.get('name'), callbackURL },
-      verify: { email, callbackURL }, forgot: { email, redirectTo: callbackURL }, reset: { token: resetToken, newPassword: password },
+      verify: { email, callbackURL }, forgot: { email, redirectTo: location.origin + '/account' }, reset: { token: resetToken, newPassword: password },
     }
 
     void run(async () => {
@@ -163,7 +171,7 @@ export function AccountPage() {
   function googleSignIn() {
     void run(async () => {
       const result = await post('/auth/sign-in/social', {
-        provider: 'google', callbackURL: location.origin + '/account', disableRedirect: true,
+        provider: 'google', callbackURL: accountCallback, disableRedirect: true,
       })
       if (!result.ok) throw new Error('Google sign-in unavailable')
       const target = new URL((await result.json()).url)
@@ -210,6 +218,9 @@ export function AccountPage() {
                   <button type="submit" className="ons-button" disabled={busy}><Ticket size={17} aria-hidden="true" />티켓 사용</button>
                 </form>
               )}
+              {studyTarget && (account.access.bookVerified || ['1', 'review'].includes(studyTarget.key)) &&
+                <a href={studyTarget.href} className="ons-account-continue">학습으로 돌아가기<ArrowRight size={17} aria-hidden="true" /></a>}
+              {account.user.id && <LegacyImport key={account.user.id} account={account.user} />}
               {account.admin && <a href="/admin" className="ons-admin-link"><ShieldCheck size={17} aria-hidden="true" />관리자 페이지</a>}
               <button type="button" className="ons-text-button ons-sign-out" disabled={busy} onClick={() => void run(async () => {
                 if (!(await post('/auth/sign-out', {})).ok) throw new Error('Sign-out failed')

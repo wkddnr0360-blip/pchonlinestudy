@@ -7,7 +7,7 @@ npm run build:ons2
 npm run preview:ons2:design
 ```
 
-`http://127.0.0.1:8788`에서 홈, 로그인, 관리자, 황금 티켓 사용을 확인한다. `http://127.0.0.1:8788/study`에서 합성 OX 문제를 풀고 해설과 오답을 확인할 수 있다. 미리보기 서버는 루프백 주소에만 열리고 합성 데이터로 응답한다. 계정 연결과 외부 전송은 실제 Worker에서 별도로 테스트한다. 티켓 체험 화면에는 입력할 테스트 코드가 표시된다.
+`http://127.0.0.1:8788/?preview=free`에서 3단계 홈과 무료 회원의 잠금 상태를, `http://127.0.0.1:8788/study?stage=1`에서 편·장·절 목차와 합성 OX 학습을 확인한다. `http://127.0.0.1:8788/?preview=verified`을 열면 2·3단계와 실전 모의고사를 체험할 수 있다. 로그인, 황금 티켓, 관리자도 상단 미리보기 메뉴에서 연다. 미리보기 서버는 루프백 주소에만 열리고 합성 데이터로 응답한다. 계정 연결과 외부 전송은 실제 Worker에서 검증한다.
 
 ## 로컬 검증
 
@@ -42,6 +42,12 @@ npm run dev:ons2
 
 승인된 Workers 이관 때 기존 Pages와 동일한 HTTPS 주소의 루트에서 `LEGACY_PAGES_CACHE_MIGRATION=1`을 사용한다. 이전 앱은 갱신 표시를 통해 새 Worker를 설치하고, 진행 중인 학습·모의고사를 마친 뒤 사용자가 적용할 수 있다. 이미 있던 `?ons-retry=1` 경로로 캐시를 거치지 않고 새 화면을 여는 방법도 제공한다. 전환 Worker는 과거 온스 셸·교재 캐시만 지운다. IndexedDB 학습 기록과 계정 연동은 별도 P0-C 이관 범위다.
 
+## 공개 정적 파일 캐시
+
+콘텐츠 해시가 붙은 `/assets/`의 이미지·CSS·JS는 Workers Static Assets에서 직접 제공한다. Cloudflare의 계층형 캐시를 사용하며 이 경로에는 R2 객체 읽기가 없다. 브라우저에는 `public, max-age=31536000, immutable`을 보낸다. 빌드에서 공개 파일 목록과 `_headers`를 검사한다. HTML, 세션, 교재 API, 관리자 구매 사진은 Worker의 `no-store` 규칙을 적용한다. private R2의 공개 URL은 비활성으로 유지한다. [Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/) · [Cloudflare 정적 파일 헤더](https://developers.cloudflare.com/workers/static-assets/headers/)
+
+스테이징을 연 뒤 같은 해시 자산을 같은 위치에서 연속 요청해 `CF-Cache-Status`와 `ETag`를 확인한다. `/study` 셸·문제 API·구매 사진은 캐시되지 않아야 한다. 캐시 규칙을 추가할 경우 공개 해시 자산 경로만 지정한다. 배포 검증에서 API와 사진의 캐시 제외도 다시 확인한다.
+
 ## 스테이징 구매 인증 준비
 
 1. `0001_auth.sql`부터 `0004_purchase_queue_index.sql`까지 별도 D1에 적용한다. 스테이징에서는 합성 교재 사진과 테스트 계정을 사용한다.
@@ -52,5 +58,15 @@ npm run dev:ons2
 ## 스테이징 학습 검증
 
 `0005_study.sql`은 교재 번호와 단계, 수정 버전 및 OX 풀이 사건을 저장한다. 이 마이그레이션에는 교재 데이터가 없다. 로컬 브라우저와 Worker 통합 테스트가 `tests/ons2-book-fixture.mjs`의 합성 문제를 임시 D1에 삽입한다. 교재 원문은 권한이 확인된 별도 입력과 이관 검증을 거친다.
+
+`0006_book_outline.sql`에 원본 편·장·절 이름과 쪽수를, `0007_mock_exam.sql`에 서버 시험과 답안을 저장한다. 실제 교재를 로컬 D1에 연결할 때 기존 정규화 디렉터리와 단계별 장 파일을 그대로 사용한다. 다음 명령은 기존 파일의 3,129개 식별자와 목차 집계를 검증한 뒤 Git에서 제외된 위치에 SQL을 만든다. 실제 자료를 적재할 DB는 비어 있는 별도 로컬 DB로 지정한다.
+
+```sh
+node scripts/prepare_ons2_book.mjs "/path/to/normalized-book/manifest.json"
+npm run db:ons2:local
+npx wrangler d1 execute DB --local --file .ons2/private/normalized-book.sql --config cloudflare/wrangler.local.jsonc
+```
+
+부여된 권한으로 실제 전체 교재를 사용할 수 있는 환경에서 목차명, 문항 수, 기출 출처를 대조한 뒤 운영 적용을 검토한다. 목차·모의고사 마이그레이션은 로컬에서 검증했으며 외부 스테이징에는 적용 대기 중이다.
 
 `/study`에서 허용된 단계와 번호 범위, 답 제출 후 해설 표시, 오답 재풀이를 확인한다. 기존 OX 기록은 동일 주소의 브라우저 또는 온스 JSON 백업에서 선택하고, 이메일이 표시된 수신 계정으로 이관을 확정한다. 서버는 문제 번호, 사용자 답, 시각, 중복 식별자를 수신한다. 기존 시험 내용과 저장된 채점값은 브라우저에서 이관 요청에 포함하지 않는다. 기존 시험 및 오답 해소 상태는 후속 이관 범위다.

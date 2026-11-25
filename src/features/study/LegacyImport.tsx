@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FolderOpen, Import } from 'lucide-react'
-import { legacyBatchSize, legacyEventId, type LegacyAttempt } from '../../../shared/study'
+import { legacyBatchSize, legacyEventId, type LegacyAttempt, type StudyCatalog } from '../../../shared/study'
 import { studyError, studyRequest } from './api'
 
 function projectAttempts(rows: unknown[]): LegacyAttempt[] {
@@ -19,10 +19,9 @@ function projectAttempts(rows: unknown[]): LegacyAttempt[] {
   return selected
 }
 
-export function LegacyImport({ account, allowed, onImported }: {
-  account: { id: string; email: string }; allowed: ReadonlySet<number>; onImported: () => void
-}) {
+export function LegacyImport({ account }: { account: { id: string; email: string } }) {
   const [candidate, setCandidate] = useState<LegacyAttempt[] | null>(null)
+  const [allowed, setAllowed] = useState<ReadonlySet<number>>(new Set())
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
 
@@ -31,6 +30,8 @@ export function LegacyImport({ account, allowed, onImported }: {
     setNote('')
     setBusy(true)
     try {
+      const { questions } = await studyRequest<StudyCatalog>('/study/catalog')
+      setAllowed(new Set(questions.map(({ no }) => no)))
       if (file) {
         if (file.size > 40 * 1024 * 1024) throw new Error('백업 파일은 40MB까지 열 수 있습니다.')
         const value = JSON.parse(await file.text())
@@ -43,7 +44,8 @@ export function LegacyImport({ account, allowed, onImported }: {
         setCandidate(projectAttempts(await db.attempts.toArray()))
       }
     } catch (error) {
-      setNote(error instanceof SyntaxError ? '백업 파일을 읽을 수 없습니다.' : error instanceof Error ? error.message : '기존 기록을 읽을 수 없습니다.')
+      setNote(error instanceof SyntaxError ? '백업 파일을 읽을 수 없습니다.'
+        : error instanceof Error && error.message.includes('백업') ? error.message : studyError(error))
     } finally { setBusy(false) }
   }
 
@@ -69,19 +71,18 @@ export function LegacyImport({ account, allowed, onImported }: {
       setNote(`${imported ? `${imported}개를 저장했습니다. ` : ''}${studyError(error)}`)
     } finally {
       setBusy(false)
-      onImported()
     }
   }
 
-  return <details className="study-card study-import">
+  return <details className="ons-legacy-import">
     <summary><Import size={20} aria-hidden="true" />기존 OX 진도 가져오기</summary>
     <p>이 주소의 브라우저 기록이나 이전 사이트에서 내려받은 온스 백업을 선택하세요. 이관하는 항목은 문제 번호, 내 답, 풀이 시각입니다.</p>
-    <div className="study-import-actions">
-      <button type="button" className="study-secondary" disabled={busy} onClick={() => void preview()}>이 브라우저에서 찾기</button>
-      <label className="study-secondary study-file"><FolderOpen size={17} aria-hidden="true" /> 온스 백업 JSON 선택<input type="file" accept=".json,application/json" disabled={busy}
+    <div className="ons-legacy-actions">
+      <button type="button" className="ons-legacy-action" disabled={busy} onClick={() => void preview()}>이 브라우저에서 찾기</button>
+      <label className="ons-legacy-action ons-legacy-file"><FolderOpen size={17} aria-hidden="true" /> 온스 백업 JSON 선택<input type="file" accept=".json,application/json" disabled={busy}
         onChange={(event) => { const file = event.currentTarget.files?.[0]; if (file) void preview(file); event.currentTarget.value = '' }} /></label>
     </div>
-    {candidate && <div className="study-import-confirm">
+    {candidate && <div className="ons-legacy-confirm">
       <p>{candidate.length ? <>유효한 기록 {candidate.length}개 중 {eligible.length}개를 <strong>{account.email}</strong>에 가져올 수 있습니다.</>
         : '가져올 OX 기록이 없습니다.'}</p>
       <button type="button" className="ons-button" disabled={busy || !eligible.length} onClick={() => void transfer()}>이 계정으로 가져오기</button>
