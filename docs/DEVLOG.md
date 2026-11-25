@@ -1,5 +1,12 @@
 # 개발 기록
 
+## 2026-11-26 · P0-B 교재 구매 확인과 1회용 황금 티켓
+
+- `migrations/0003_purchase_review.sql`, `worker/auth/{admin.ts,config.ts}`, `worker/routes/{account.ts,purchases.ts}`, `worker/services/{purchases.ts,book-access.ts}`, `worker/jobs/purchase-photos.ts`에서 신청자 사진·카페 닉네임 제출, 관리자 검토/승인·반려·재제출, 계정 귀속 티켓 발급·재발급·폐기 및 파기를 연결했다. 관리자 권한은 D1에서 요청별로 확인하고 Better Auth 인증 앱 확인은 세션별 15분까지만 인정한다. 티켓은 128비트 난수와 해시를 쓰며, 재발급 시 이전 미사용 티켓을 폐기한다. 조회 화면에는 최근 30개 상태와 날짜만 제공한다. JPEG는 `jpeg-js` 0.4.4로 크기를 제한해 검증하고 메타데이터 없이 재인코딩한다. [Better Auth 2FA](https://better-auth.com/docs/plugins/2fa) · [jpeg-js 라이선스](https://github.com/jpeg-js/jpeg-js#license)
+- `src/features/auth/{PurchaseForm.tsx,AccountPage.tsx,TicketArt.tsx,account.css}`, `src/features/admin/`, `shared/purchase.ts`를 추가·수정했다. 서버가 최초 사용을 수락했을 때만 76×44 논리 픽셀 캔버스에서 8프레임으로 황금 티켓의 절취·도장·해금을 그린다. 모션 줄이기 사용자는 완료 프레임으로 바로 간다. 원문 코드의 표시와 복사 가능 상태는 발급 화면에만 남는다.
+- `npm test` 22개, `npm run build:ons2` 정적 파일 7개, `npm run test:ons2:runtime` 7개, `npm run test:ons2:browser` 10개를 통과했다. 합성 계정과 로컬 D1·R2로 사진 메타데이터 제거, 교차 계정 차단, 권한 회수, 관리자 재인증, 동시 발급과 최초 1회 사용, 심사 사진 파기를 확인했다. 처음에는 D1의 트리거 변경을 포함한 건수로 사용 여부를 세어 모션을 시작하지 못했고, `UPDATE … RETURNING`으로 실제 변경된 티켓을 확인하도록 고쳤다. 브라우저 캡처는 `.ons2/qa/golden-ticket.png`와 `.ons2/qa/purchase-admin.png`에 있다.
+- 실제 Google/메일, 개인정보 보관 정책 승인, 외부 스테이징과 실물 기기 검증은 대기 중이다. 관리자 구매 화면 이후에는 회원 운영 도구와 P0-C 문제·채점·진도 이관·MCP가 남았다. 운영 배포는 없다. 롤백은 Worker/UI 커밋을 되돌리고 추가 테이블과 구매·감사 기록을 보존한다. 외부 설정은 `docs/ONS2-STAGING.md`에 기록했다.
+
 ## 2026-11-26 · 구 Pages 캐시에서 Workers로 전환
 
 - Workers HTML은 `no-store`로 제공하고 파일 내용 해시가 붙은 공개 자산은 `immutable`로 제공한다. `cloudflare/web/index.html`에 캐시된 Pages의 우회 쿼리와 호환되는 다시 열기 링크를 넣었다.

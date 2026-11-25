@@ -1,0 +1,16 @@
+.ons-purchase-admin { width: min(64rem, calc(100% - 2rem)); margin: 2rem auto 4rem; }
+.ons-purchase-admin h1 { margin: 0 0 1.5rem; font-size: clamp(1.7rem, 4vw, 2.6rem); letter-spacing: -0.045em; }
+.ons-purchase-admin h2 { margin: 0; font-size: 1.15rem; }
+.ons-purchase-admin p { margin: 0; }
+.ons-admin-queue { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); align-items: start; gap: 1rem; }
+.ons-admin-box, .ons-admin-box form, .ons-admin-box label { display: grid; gap: 0.75rem; }
+.ons-admin-box { padding: 1rem; margin-bottom: 1rem; border-radius: 1rem; border: 1px solid #dee3ed; background: #fff; overflow-wrap: anywhere; }
+.ons-admin-box.ons-ticket-used { background: #fff4cc; }
+.ons-admin-box code { overflow-wrap: anywhere; }
+.ons-admin-box label { gap: 0.3rem; font-weight: 650; }
+.ons-admin-box input, .ons-admin-box select { box-sizing: border-box; width: 100%; min-height: 2.75rem; padding: 0.4rem 0.55rem; font: inherit; border: 1px solid var(--ons-border); border-radius: 0.6rem; background: #fff; }
+.ons-admin-request-header, .ons-admin-buttons { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+.ons-admin-request-header { justify-content: space-between; }
+.ons-admin-request-header strong { color: var(--ons-secondary); font-size: 0.9rem; }
+.ons-admin-photo { display: block; max-width: 100%; max-height: 22rem; object-fit: contain; }
+.ons-admin-history { margin: 0; color: var(--ons-secondary); }

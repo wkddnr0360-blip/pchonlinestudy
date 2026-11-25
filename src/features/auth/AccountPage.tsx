@@ -1,12 +1,18 @@
 import { ArrowLeft, ArrowRight, Eye, EyeOff, LogOut } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AccountArtwork } from './AccountArtwork'
+import { TicketArt } from './TicketArt'
+import { PurchaseForm } from './PurchaseForm'
 import googleMark from './google-g.png'
 import './account.css'
 
 type Mode = 'signin' | 'signup' | 'verify' | 'forgot' | 'reset'
 type Methods = { email: boolean; google: boolean }
-type Account = { user: { email: string; name: string }; access: { bookVerified: boolean; expiresAt: number | null } }
+type Account = {
+  user: { email: string; name: string }
+  access: { bookVerified: boolean; expiresAt: number | null }
+  admin?: { mfaEnabled: boolean; mfaFresh: boolean } | null
+}
 
 const headings: Record<Mode, string> = {
   signin: '로그인', signup: '회원가입', verify: '인증 메일 다시 보내기', forgot: '비밀번호 찾기', reset: '비밀번호 변경',
@@ -49,6 +55,7 @@ export function AccountPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [passwordVisible, setPasswordVisible] = useState(false)
+  const [ticketConsumed, setTicketConsumed] = useState(false)
   const heading = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
@@ -116,6 +123,10 @@ export function AccountPage() {
         return
       }
       if (mode === 'signin') {
+        if ((await result.json()).twoFactorRequired) {
+          location.assign('/admin?verify=1')
+          return
+        }
         const signedIn = await getAccount()
         if (!signedIn) throw new Error('Session missing')
         setAccount(signedIn)
@@ -141,8 +152,10 @@ export function AccountPage() {
         return
       }
       if (!result.ok) throw new Error('Code redemption failed')
-      setAccount(await getAccount())
-      setNotice('교재 이용권을 등록했습니다.')
+      const redeemed = await result.json() as { access: Account['access']; consumedNow: boolean }
+      setAccount((current) => current ? { ...current, access: redeemed.access } : current)
+      setTicketConsumed(redeemed.consumedNow)
+      if (!redeemed.consumedNow) setNotice('교재 이용권을 등록했습니다.')
     })
   }
 
@@ -177,15 +190,26 @@ export function AccountPage() {
               <p>{account.access.bookVerified && account.access.expiresAt !== null
                 ? `교재 인증 이용권 · ${expiryDate.format(account.access.expiresAt - 1)}까지`
                 : '무료 회원'}</p>
+              {ticketConsumed && <div className="ons-ticket ons-ticket-used" role="status">
+                <TicketArt animate />
+                <div><strong>황금 티켓 사용 완료</strong><span>정회원 이용권이 열렸어요.</span></div>
+              </div>}
+              {!account.access.bookVerified && <PurchaseForm />}
               {!account.access.bookVerified && (
-                <form onSubmit={submitCode}>
-                  <label>교재 인증 코드<input name="code" maxLength={80} required autoComplete="off" /></label>
-                  <button type="submit" className="ons-button" disabled={busy}>이용권 등록</button>
+                <form onSubmit={submitCode} className="ons-ticket-form">
+                  <div className="ons-ticket">
+                    <TicketArt />
+                    <div><strong>교재 인증 티켓</strong><span>내 계정에 발급된 티켓을 등록하세요.</span></div>
+                  </div>
+                  <label>티켓 코드<input name="code" maxLength={80} required autoComplete="off" spellCheck={false} /></label>
+                  <button type="submit" className="ons-button" disabled={busy}>티켓 사용</button>
                 </form>
               )}
+              {account.admin && <a href="/admin" className="ons-admin-link">관리자 페이지</a>}
               <button type="button" className="ons-text-button ons-sign-out" disabled={busy} onClick={() => void run(async () => {
                 if (!(await post('/auth/sign-out', {})).ok) throw new Error('Sign-out failed')
                 setAccount(null)
+                setTicketConsumed(false)
                 changeMode('signin')
                 setNotice('로그아웃했습니다.')
               })}><LogOut aria-hidden="true" size={16} />로그아웃</button>

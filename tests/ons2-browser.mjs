@@ -102,6 +102,71 @@ test('the account design uses the verified pose when a member has a textbook ent
   }
 })
 
+for (const reducedMotion of ['no-preference', 'reduce']) {
+  test(`a new ticket stamps and unlocks the account with ${reducedMotion} motion`, async () => {
+    const page = await browser.newPage({ viewport: { width: 880, height: 800 }, reducedMotion })
+    try {
+      const user = { name: '합성 티켓 회원', email: 'ticket@example.test' }
+      await page.route('**/api/v1/session', (route) => route.fulfill({ json: { user, access: { bookVerified: false, expiresAt: null } } }))
+      await page.route('**/api/v1/purchase', (route) => route.fulfill({ json: { purchase: {
+        id: 'synthetic-request', cafeNickname: '합성 회원', status: 'approved', submittedAt: 1, reviewedAt: 2, reviewNote: null,
+      } } }))
+      await page.route('**/api/v1/book-access/redeem', (route) => route.fulfill({ json: {
+        access: { bookVerified: true, expiresAt: Date.parse('2027-03-14T15:00:00Z') }, consumedNow: true,
+      } }))
+      await page.goto(baseURL + '/account')
+      const code = page.getByRole('textbox', { name: '티켓 코드' })
+      await code.fill('ABCD1234-ABCD1234-ABCD1234-ABCD1234')
+      const initial = await page.locator('.ons-ticket-art').evaluate((canvas) => canvas.toDataURL())
+      await page.getByRole('button', { name: '티켓 사용' }).click()
+      const used = page.getByRole('status').filter({ hasText: '황금 티켓 사용 완료' })
+      await used.waitFor()
+      const art = used.locator('canvas')
+      if (reducedMotion === 'no-preference') {
+        await page.waitForFunction(() => {
+          const frame = Number(document.querySelector('.ons-ticket-used canvas')?.dataset.frame)
+          return frame > 0 && frame < 7
+        })
+      } else {
+        assert.equal(await art.getAttribute('data-frame'), '7')
+      }
+      await page.locator('.ons-ticket-used canvas[data-frame="7"]').waitFor()
+      assert.notEqual(await art.evaluate((canvas) => canvas.toDataURL()), initial)
+      assert.equal(await code.count(), 0)
+      if (reducedMotion === 'no-preference') await page.screenshot({ path: '.ons2/qa/golden-ticket.png', animations: 'disabled' })
+    } finally {
+      await page.close()
+    }
+  })
+}
+
+test('the admin screen reveals a newly issued ticket once and shows its status', async () => {
+  const page = await browser.newPage({ viewport: { width: 1100, height: 800 } })
+  try {
+    const now = Date.now()
+    const row = { id: 'synthetic-approved', cafeNickname: '검토된 합성 회원', status: 'approved', submittedAt: now, reviewedAt: now, reviewNote: null, hasPhoto: false, ticket: null }
+    const ticket = { id: 'synthetic-ticket', issuedAt: now, expiresAt: now + 172800000, redeemedAt: null, revokedAt: null }
+    const code = 'ABCD1234-ABCD1234-ABCD1234-ABCD1234'
+    await page.route('**/api/v1/session', (route) => route.fulfill({ json: { admin: { mfaEnabled: true, mfaFresh: true } } }))
+    await page.route('**/api/v1/admin/purchases?page=*', (route) => route.fulfill({ json: { purchases: [row], hasNext: false } }))
+    await page.route(`**/api/v1/admin/purchases/${row.id}/ticket`, async (route) => {
+      assert.deepEqual(route.request().postDataJSON(), { expectedTicketId: null })
+      row.ticket = ticket
+      await route.fulfill({ status: 201, json: { code, ticket } })
+    })
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.goto(baseURL + '/admin')
+    await page.getByRole('button', { name: '1회용 티켓 발급' }).click()
+    await page.getByText(code, { exact: true }).waitFor()
+    await page.getByRole('button', { name: '티켓 코드 닫기' }).click()
+    assert.equal(await page.getByText(code, { exact: true }).count(), 0)
+    await page.getByText(/최근 티켓 · 발급됨/).waitFor()
+    await page.screenshot({ path: '.ons2/qa/purchase-admin.png', animations: 'disabled' })
+  } finally {
+    await page.close()
+  }
+})
+
 test('login and password recovery are usable in iPhone-sized WebKit', async () => {
   const safari = await webkit.launch()
   try {

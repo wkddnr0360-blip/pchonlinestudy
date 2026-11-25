@@ -20,22 +20,39 @@ export function privateHeaders(response: Response) {
 }
 
 export async function readSmallJson(request: Request): Promise<unknown> {
-  if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json' || !request.body) return null
+  if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json') return null
+  const bytes = await readLimitedBody(request, 1024)
+  if (!bytes) return null
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes))
+  } catch {
+    return null
+  }
+}
+
+export async function readLimitedBody(request: Request, limit: number) {
+  if (!request.body || Number(request.headers.get('Content-Length')) > limit) return null
   const reader = request.body.getReader()
-  const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
-  let text = ''
-  let bytes = 0
+  const parts: Uint8Array[] = []
+  let size = 0
   try {
     while (true) {
       const { value, done } = await reader.read()
-      if (done) return JSON.parse(text + decoder.decode())
-      bytes += value.byteLength
-      if (bytes > 1024) {
+      if (done) break
+      size += value.byteLength
+      if (size > limit) {
         await reader.cancel()
         return null
       }
-      text += decoder.decode(value, { stream: true })
+      parts.push(value)
     }
+    const output = new Uint8Array(size)
+    let offset = 0
+    for (const part of parts) {
+      output.set(part, offset)
+      offset += part.byteLength
+    }
+    return output
   } catch {
     return null
   } finally {

@@ -30,3 +30,10 @@ npm run dev:ons2
 ## 같은 주소에서 서비스 워커 전환
 
 승인된 Workers 이관 때 기존 Pages와 동일한 HTTPS 주소의 루트에서 `LEGACY_PAGES_CACHE_MIGRATION=1`을 사용한다. 이전 앱은 갱신 표시를 통해 새 Worker를 설치하고, 진행 중인 학습·모의고사를 마친 뒤 사용자가 적용할 수 있다. 이미 있던 `?ons-retry=1` 경로로 캐시를 거치지 않고 새 화면을 여는 방법도 제공한다. 전환 Worker는 과거 온스 셸·교재 캐시만 지운다. IndexedDB 학습 기록과 계정 연동은 별도 P0-C 이관 범위다.
+
+## 스테이징 구매 인증 준비
+
+1. `0001_auth.sql`부터 `0003_purchase_review.sql`까지 별도 D1에 적용한다. 스테이징에서는 합성 교재 사진과 테스트 계정을 사용한다.
+2. 관리자용 이메일 계정으로 가입하고 이메일을 인증한다. 소유자가 D1에서 해당 계정 ID의 `member_roles`에 `admin` 역할을 추가한다. 회원 브라우저에는 권한 부여 경로가 없다. `/admin`에서 계정 비밀번호를 다시 입력하고 설정 키를 인증 앱에 직접 등록한다. 구매 목록과 사진 접근, 승인 및 티켓 발급·폐기에는 현재 관리자 역할과 15분 이내 인증 앱 코드 확인이 필요하다.
+3. `PURCHASE_TICKET_TTL_HOURS`에 승인한 티켓 유효 시간을 설정한다. 로컬 테스트의 168시간은 운영 정책 제안값이다. 발급 직후 코드가 한 번 표시되며 관리자가 등록된 신청자에게 승인된 비공개 경로로 전달한다. 화면을 닫은 코드를 다시 조회할 수 없어 분실 시 재발급 절차를 사용한다.
+4. `PURCHASE_PHOTO_RETENTION_DAYS`에 승인한 심사 완료 사진 보관 기간을 넣고 앱 Worker에 Cron Trigger를 설정한다. 로컬은 30일을 검증한다. 승인·반려·재제출 처리일을 기준으로 private R2 사진을 지우고 D1 사진 경로와 파기 이력을 정리한다. D1 장애로 연결 여부를 확정하지 못한 고아 업로드에 대해서는 별도 회수 절차를 스테이징에서 확인한다. [Cloudflare Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/)

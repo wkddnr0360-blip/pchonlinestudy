@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth'
+import { twoFactor } from 'better-auth/plugins/two-factor'
 import type { AppEnv } from '../index'
 
 export const authPath = '/api/v1/auth'
@@ -8,6 +9,8 @@ const emailRoutes = new Set([
   'GET /verify-email', 'POST /request-password-reset', 'POST /reset-password',
 ])
 const googleRoutes = new Set(['POST /sign-in/social', 'GET /callback/google'])
+export const enableMfaPath = authPath + '/two-factor/enable'
+export const verifyMfaPath = authPath + '/two-factor/verify-totp'
 
 export function authSettings(env: AppEnv) {
   if (!env.APP_ORIGIN || !env.BETTER_AUTH_SECRET || env.BETTER_AUTH_SECRET.length < 32) return null
@@ -59,6 +62,7 @@ export function createAuth(env: AppEnv, settings: AuthSettings) {
     session: { expiresIn: 60 * 60 * 24 * 7, cookieCache: { enabled: false } },
     verification: { storeIdentifier: 'hashed' },
     account: { accountLinking: { enabled: false }, encryptOAuthTokens: true },
+    plugins: [twoFactor()],
     socialProviders: settings.google ? {
       google: {
         clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET!,
@@ -109,6 +113,7 @@ export function createAuth(env: AppEnv, settings: AuthSettings) {
 export function authRoute(settings: AuthSettings, method: string, path: string) {
   const route = `${method} ${path.slice(authPath.length)}`
   return route === 'POST /sign-out'
+    || (settings.email && method === 'POST' && [enableMfaPath, verifyMfaPath].includes(path))
     || (settings.email && (emailRoutes.has(route) || /^GET \/reset-password\/[a-zA-Z0-9_-]{16,128}$/.test(route)))
     || (settings.google && googleRoutes.has(route))
 }

@@ -2,6 +2,7 @@ import { json } from './http'
 import { fingerprintedAsset } from '../shared/static-assets'
 import { accountRoutes } from './routes/account'
 import { legacyCacheRoute } from './routes/legacy-cache'
+import { purgeReviewedPhotos } from './jobs/purchase-photos'
 
 export interface AppEnv {
   ONS_ENV: 'local' | 'staging' | 'production'
@@ -16,9 +17,14 @@ export interface AppEnv {
   MAIL_FROM?: string
   AUTH_EMAIL_MODE?: string
   LEGACY_PAGES_CACHE_MIGRATION?: string
+  PURCHASE_TICKET_TTL_HOURS?: string
+  PURCHASE_PHOTO_RETENTION_DAYS?: string
 }
 
 export default {
+  async scheduled(event, env) {
+    await purgeReviewedPhotos(env, event.scheduledTime)
+  },
   async fetch(request, env) {
     const url = new URL(request.url)
     const { method } = request
@@ -36,7 +42,7 @@ export default {
     const migration = await legacyCacheRoute(request, env, url)
     if (migration) return migration
 
-    const isShell = url.pathname === '/' || url.pathname === '/account'
+    const isShell = url.pathname === '/' || url.pathname === '/account' || url.pathname === '/admin'
     if (!read || (!isShell && !fingerprintedAsset.test(url.pathname.slice(1)))) {
       return json({ error: 'not_found' }, 404, method)
     }
@@ -52,7 +58,7 @@ export default {
       response.headers.set('Cache-Control', 'no-store')
       response.headers.set('Referrer-Policy', 'no-referrer')
       response.headers.set('Content-Security-Policy', [
-        "default-src 'self'", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'",
+        "default-src 'self'", "img-src 'self' blob:", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'",
       ].join('; '))
     } else if (asset.status === 200 || asset.status === 304) {
       response.headers.set('Cache-Control', 'public, max-age=31536000, immutable')
