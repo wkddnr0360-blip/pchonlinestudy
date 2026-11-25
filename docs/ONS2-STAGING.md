@@ -26,3 +26,7 @@ npm run dev:ons2
 
 - 교재 JSON 28개는 2026-11-25 GitHub 브랜치 4개의 이력에서 제거했다. 브랜치 이름과 교재 이외 파일은 보존했다. 현재 브랜치의 교재 경로에 다시 커밋하지 않도록 개발 브랜치에 `.gitignore`와 CI 검사를 추가했다. 이전 이력에서 받은 복제본은 깨끗한 재복제를 사용한다.
 - 소유자 선택에 따라 운영 Pages는 유지했다. 이력으로부터 새 Pages 빌드를 실행하려면 권한이 있는 별도 자료 준비 경로가 필요하다. GitHub의 과거 커밋 주소, PR 내부 참조, 제3자 사본, 이미 설치된 PWA 캐시는 각각 별도 확인 대상이다. GitHub가 관리하는 내부 참조와 캐시의 처리 한계는 공식 정책을 따른다. [GitHub 이력 정리와 잔여 사본](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)
+
+## 같은 주소에서 서비스 워커 전환
+
+승인된 Workers 이관 때 기존 Pages와 동일한 HTTPS 주소의 루트에서 `LEGACY_PAGES_CACHE_MIGRATION=1`을 사용한다. 이전 앱은 갱신 표시를 통해 새 Worker를 설치하고, 진행 중인 학습·모의고사를 마친 뒤 사용자가 적용할 수 있다. 이미 있던 `?ons-retry=1` 경로로 캐시를 거치지 않고 새 화면을 여는 방법도 제공한다. 전환 Worker는 과거 온스 셸·교재 캐시만 지운다. IndexedDB 학습 기록과 계정 연동은 별도 P0-C 이관 범위다.

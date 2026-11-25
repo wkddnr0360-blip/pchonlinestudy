@@ -16,7 +16,7 @@ async function verifyDirectory(directory, prefix = '') {
       count += await verifyDirectory(join(directory, entry.name), 'assets/')
       continue
     }
-    if (!entry.isFile() || (name !== 'index.html' && !fingerprintedAsset.test(name))) {
+    if (!entry.isFile() || (!['index.html', 'release.json'].includes(name) && !fingerprintedAsset.test(name))) {
       throw new Error(`Unexpected Workers static asset: ${name}`)
     }
     if (/\.(?:html|js|css)$/.test(name)) {
@@ -31,6 +31,10 @@ async function verifyDirectory(directory, prefix = '') {
 }
 
 const count = await verifyDirectory(client)
+const release = JSON.parse(await readFile(join(client, 'release.json'), 'utf8'))
+if (Object.keys(release).length !== 2 || !/^[a-f0-9-]{36}$/.test(release.id) || !Number.isSafeInteger(release.builtAt) || release.builtAt <= 0) {
+  throw new Error('Invalid Workers release marker.')
+}
 const index = await readFile(join(client, 'index.html'), 'utf8')
 const scripts = [...index.matchAll(/<script\s[^>]*?src="\/([^\"]+)"/g)].map((match) => match[1])
 if (!scripts.length || scripts.some((path) => !fingerprintedAsset.test(path) || !path.endsWith('.js'))) {

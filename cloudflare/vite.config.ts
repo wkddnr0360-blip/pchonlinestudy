@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url'
+import { randomUUID } from 'node:crypto'
 import react from '@vitejs/plugin-react'
 import { defineConfig, normalizePath } from 'vite'
 
@@ -25,6 +26,7 @@ export default defineConfig({
             }
           }
         }
+        this.emitFile({ type: 'asset', fileName: 'release.json', source: JSON.stringify({ id: randomUUID(), builtAt: Date.now() }) })
       },
     },
   ],

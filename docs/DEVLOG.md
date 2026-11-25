@@ -1,5 +1,11 @@
 # 개발 기록
 
+## 2026-11-26 · 구 Pages 캐시에서 Workers로 전환
+
+- Workers HTML은 `no-store`로 제공하고 파일 내용 해시가 붙은 공개 자산은 `immutable`로 제공한다. `cloudflare/web/index.html`에 캐시된 Pages의 우회 쿼리와 호환되는 다시 열기 링크를 넣었다.
+- 기존 운영 주소에서 향후 전환하는 경우를 위해 `worker/routes/legacy-cache.ts` 및 Vite `release.json`을 추가했다. `LEGACY_PAGES_CACHE_MIGRATION=1` 설정에서 이전 앱의 갱신 버튼과 호환되는 Worker가 대기한다. 활성화되면 이 앱의 과거 셸·교재 캐시를 정리한다. IndexedDB는 건드리지 않는다. 현재 운영 주소와 배포에는 적용하지 않았다.
+- `npm run build:ons2` 산출물 7개, Worker 런타임 6개, Chromium·WebKit 브라우저 7개를 통과했다. 합성 구버전과 새 Worker를 같은 로컬 주소에서 전환해 우회 링크, 브라우저의 대기 상태, 기존 셸·교재 캐시 정리, 별도 캐시와 IndexedDB 테스트 데이터 보존을 확인했다. 실제 운영 주소와 실물 기기는 이관 시 검증한다. 롤백은 마이그레이션 설정을 제거하고, 이미 정리된 캐시는 승인된 배포로 다시 준비한다. [Cloudflare Static Assets 헤더](https://developers.cloudflare.com/workers/static-assets/headers/)
+
 ## 2026-11-26 · 계정 화면 반응형 개편
 
 - `src/features/auth/AccountPage.tsx`, `account.css`, `AccountArtwork.tsx`에 반응형 계정 카드와 비밀번호 보기/숨기기를 적용했다. 짧은 모바일 화면에서도 로그인 버튼이 첫 화면에 들어오도록 조정했다. shadcn/ui 로그인 레이아웃과 GOV.UK/WAI 인증 입력 패턴을 참고했고 아이콘은 기존 Lucide를 사용했다. [shadcn/ui 로그인 블록](https://ui.shadcn.com/blocks/login) · [GOV.UK 비밀번호 입력](https://design-system.service.gov.uk/components/password-input/) · [WAI 인증 입력 지침](https://www.w3.org/WAI/WCAG22/Techniques/html/H100)

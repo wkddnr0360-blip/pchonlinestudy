@@ -1,6 +1,7 @@
 import { json } from './http'
 import { fingerprintedAsset } from '../shared/static-assets'
 import { accountRoutes } from './routes/account'
+import { legacyCacheRoute } from './routes/legacy-cache'
 
 export interface AppEnv {
   ONS_ENV: 'local' | 'staging' | 'production'
@@ -14,6 +15,7 @@ export interface AppEnv {
   RESEND_API_KEY?: string
   MAIL_FROM?: string
   AUTH_EMAIL_MODE?: string
+  LEGACY_PAGES_CACHE_MIGRATION?: string
 }
 
 export default {
@@ -31,6 +33,8 @@ export default {
     }
     const account = await accountRoutes(request, env, url)
     if (account) return account
+    const migration = await legacyCacheRoute(request, env, url)
+    if (migration) return migration
 
     const isShell = url.pathname === '/' || url.pathname === '/account'
     if (!read || (!isShell && !fingerprintedAsset.test(url.pathname.slice(1)))) {
@@ -50,6 +54,8 @@ export default {
       response.headers.set('Content-Security-Policy', [
         "default-src 'self'", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'",
       ].join('; '))
+    } else if (asset.status === 200 || asset.status === 304) {
+      response.headers.set('Cache-Control', 'public, max-age=31536000, immutable')
     }
     return response
   },
