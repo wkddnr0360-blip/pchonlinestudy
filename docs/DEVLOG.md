@@ -1,5 +1,12 @@
 # 개발 기록
 
+## 2026-11-26 · 계정 화면 반응형 개편
+
+- `src/features/auth/AccountPage.tsx`, `account.css`, `AccountArtwork.tsx`에 반응형 계정 카드와 비밀번호 보기/숨기기를 적용했다. 짧은 모바일 화면에서도 로그인 버튼이 첫 화면에 들어오도록 조정했다. shadcn/ui 로그인 레이아웃과 GOV.UK/WAI 인증 입력 패턴을 참고했고 아이콘은 기존 Lucide를 사용했다. [shadcn/ui 로그인 블록](https://ui.shadcn.com/blocks/login) · [GOV.UK 비밀번호 입력](https://design-system.service.gov.uk/components/password-input/) · [WAI 인증 입력 지침](https://www.w3.org/WAI/WCAG22/Techniques/html/H100)
+- `cloudflare/web/{main.tsx,shell.css}`와 계정 카드에 기존 철한쌤 앱 아이콘 및 `teacher.webp`를 연결했다. 로그인은 손을 흔드는 모습, 가입·인증 지원은 책을 펼친 모습, 교재 인증 계정은 법전을 든 모습을 표시한다. Worker 빌드가 배포하는 캐릭터 파일은 원본과 SHA-256이 일치한다. Google 버튼은 공식 `google-g.png`를 로컬에서 제공한다. `cloudflare/vite.config.ts`와 ADR에서 기존 `public/`의 허용 파일 두 개를 명시했다. [Google 로그인 브랜드 가이드](https://developers.google.com/identity/branding-guidelines)
+- 기존 `npm test` 22개와 Worker 런타임 6개를 통과했다. `npm run build:ons2`에서 배포 파일 6개를 검사했다. `.github/workflows/ons2.yml`과 `tests/ons2-browser.mjs`에서 Chromium 320·390·768·1280px, 합성 인증 계정 및 iPhone 크기 WebKit까지 브라우저 테스트 6개를 통과했다. 최초 확대 실행에서는 동일 IP의 네 번째 가입이 요청 제한에 걸렸다. 테스트마다 제한 카운터를 초기화했으며 앱 정책은 유지했다.
+- 화면 캡처는 `.ons2/qa/account-1280.png`, `.ons2/qa/account-iphone-webkit.png`, `.ons2/qa/signup-390.png`, `.ons2/qa/verified-account-1280.png`에 저장했다. 실물 iPhone과 외부 Google 로그인은 검증 대기다. 롤백은 이 화면 개편 커밋을 되돌리면 된다.
+
 ## 2026-11-25 · P0-B 1차 계정 인증과 교재 이용권 등록
 
 - `worker/{auth/config.ts,routes/account.ts,http.ts,index.ts}`, 앱 Wrangler 설정, `migrations/0001_auth.sql`에 Better Auth 1.7.28과 D1 연결을 추가했다. 이메일 회원가입·인증·로그인·재설정·로그아웃, 세션 회수, Cloudflare IP 기반 D1 원자적 요청 제한, Google OAuth 진입을 구현했다. 자동 계정 병합을 비활성화했다. 브라우저에는 HttpOnly 세션 쿠키를 보내고 JSON에서 세션 토큰을 제외한다. Better Auth는 MIT 라이선스이며 기본 D1 어댑터를 사용했다. [Better Auth Cloudflare 가이드](https://better-auth.com/docs/guides/cloudflare)

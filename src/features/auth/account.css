@@ -1,0 +1,282 @@
+.ons-account {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  width: min(63rem, calc(100% - 3rem));
+  min-height: 37.5rem;
+  box-sizing: border-box;
+  margin: clamp(2rem, 7vh, 5.5rem) auto;
+  border: 1px solid #e1e5ee;
+  border-radius: 1.65rem;
+  background: #fff;
+  box-shadow: 0 24px 72px -36px #28345752, 0 4px 20px #303e6110;
+}
+
+.ons-account-art {
+  --art-top: #eaf2ff;
+  --art-bottom: #d7e5fc;
+  --art-grid: #436caf20;
+  --art-accent: #586fb7;
+  position: relative;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 1.6rem 0 0 1.6rem;
+  background: linear-gradient(155deg, var(--art-top), var(--art-bottom));
+}
+
+.ons-account-art-2 {
+  --art-top: #f1edff;
+  --art-bottom: #e0dcfa;
+  --art-grid: #6550a61b;
+  --art-accent: #7155aa;
+}
+
+.ons-account-art-3 {
+  --art-top: #faf2df;
+  --art-bottom: #f3e5c9;
+  --art-grid: #85631b24;
+  --art-accent: #75531b;
+}
+
+.ons-art-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(var(--art-grid) 1px, transparent 1px), linear-gradient(90deg, var(--art-grid) 1px, transparent 1px);
+  background-size: 1.8rem 1.8rem;
+  background-position: center;
+  mask-image: radial-gradient(ellipse at 48% 52%, #000 26%, transparent 78%);
+}
+
+.ons-art-halo {
+  position: absolute;
+  width: 67%;
+  max-width: 19rem;
+  aspect-ratio: 1;
+  border: 1px solid #ffffffba;
+  border-radius: 50%;
+  background: linear-gradient(155deg, #ffffff86, #ffffff28);
+  box-shadow: 0 0 0 1.2rem #ffffff28, 0 0 0 2.4rem #ffffff16;
+}
+
+.ons-art-platform {
+  position: absolute;
+  top: calc(50% + min(32vw, 9rem));
+  width: 47%;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--art-grid);
+}
+
+.ons-art-pixel {
+  position: absolute;
+  width: 1.25rem;
+  aspect-ratio: 1;
+  background: var(--art-accent);
+  clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%);
+}
+
+.ons-art-pixel-bright { top: 28%; right: 23%; opacity: 0.68; }
+.ons-art-pixel-small { bottom: 31%; left: 23%; width: 0.75rem; opacity: 0.55; }
+
+.ons-account-teacher {
+  position: relative;
+  display: block;
+  width: min(91%, 20rem);
+  aspect-ratio: 1;
+  background-image: url('../../../public/characters/teacher.webp');
+  background-repeat: no-repeat;
+  background-position: var(--ons-pose, 0%) center;
+  background-size: 300% 100%;
+  image-rendering: pixelated;
+}
+
+.ons-account-teacher.teacher-1 { margin-inline-start: -8%; }
+.ons-account-teacher.teacher-2 { --ons-pose: 50%; }
+.ons-account-teacher.teacher-3 { --ons-pose: 100%; }
+
+.ons-account-content {
+  display: grid;
+  align-items: center;
+  padding: clamp(1.75rem, 4vh, 3.15rem) clamp(2rem, 5vw, 4rem);
+}
+
+.ons-account-form { width: min(100%, 23rem); margin-inline: auto; min-width: 0; }
+
+.ons-account h1 {
+  width: fit-content;
+  margin: 0 0 1.65rem;
+  font-size: clamp(2rem, 3vw, 2.7rem);
+  font-weight: 770;
+  letter-spacing: -0.055em;
+  line-height: 1.24;
+  overflow-wrap: anywhere;
+}
+
+.ons-account-hint { margin: -0.8rem 0 1.25rem; color: var(--ons-secondary); font-size: 0.94rem; }
+
+.ons-account-methods, .ons-identity-panel, .ons-account form {
+  display: grid;
+  gap: 1rem;
+}
+
+.ons-account label, .ons-password-field {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--ons-ink);
+  font-size: 0.9rem;
+  font-weight: 670;
+}
+
+.ons-password-field { position: relative; }
+
+.ons-account input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 3.1rem;
+  padding: 0.7rem 0.82rem;
+  border: 1px solid var(--ons-border);
+  border-radius: 0.7rem;
+  background: #fff;
+  color: var(--ons-ink);
+  font-size: 1rem;
+  font-weight: 450;
+}
+
+.ons-account input:focus { border-color: var(--ons-blue); }
+.ons-password-input { position: relative; }
+.ons-password-input input { padding-inline-end: 3.55rem; }
+
+.ons-password-toggle {
+  position: absolute;
+  inset-block: 0.15rem;
+  inset-inline-end: 0.15rem;
+  display: grid;
+  place-items: center;
+  width: 2.8rem;
+  border: 0;
+  border-radius: 0.54rem;
+  background: transparent;
+  color: var(--ons-secondary);
+  cursor: pointer;
+}
+
+.ons-password-toggle:hover:not(:disabled) { background: #edf2fd; color: var(--ons-blue); }
+.ons-password-toggle:focus-visible { outline-offset: -3px; }
+
+.ons-google-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 3rem;
+  padding: 0.6rem 12px;
+  border: 1px solid #747775;
+  border-radius: 0.72rem;
+  background: #fff;
+  color: #1f1f1f;
+  font-family: "Google Sans", system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ons-google-button img { object-fit: contain; flex: none; }
+.ons-google-button:hover:not(:disabled) { background: #f8faff; }
+
+.ons-account-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  color: var(--ons-secondary);
+  font-size: 0.78rem;
+}
+
+.ons-account-divider::before, .ons-account-divider::after {
+  flex: 1;
+  height: 1px;
+  background: #e2e6ee;
+  content: '';
+}
+
+.ons-auth-submit { width: 100%; }
+
+.ons-text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0.2rem 0.4rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--ons-blue);
+  font-size: 0.875rem;
+  font-weight: 680;
+  text-align: center;
+  cursor: pointer;
+}
+
+.ons-text-button:hover:not(:disabled) { text-decoration: underline; }
+.ons-account .ons-forgot { justify-self: end; margin-block: -0.35rem -0.58rem; }
+.ons-account .ons-text-muted { color: var(--ons-secondary); font-weight: 580; }
+.ons-return, .ons-sign-out { justify-self: start; }
+
+.ons-field-hint { margin: 0; color: var(--ons-secondary); font-size: 0.82rem; font-weight: 450; }
+
+.ons-account-links {
+  display: grid;
+  justify-items: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e8f0;
+  color: var(--ons-secondary);
+  font-size: 0.875rem;
+}
+
+.ons-account-links > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.15rem; }
+.ons-account-links > button { margin-top: -0.45rem; }
+.ons-identity-panel p { margin: 0; }
+.ons-identity { display: grid; padding: 0.9rem 1rem; border-radius: 0.75rem; background: #f3f6fd; overflow-wrap: anywhere; }
+.ons-identity span { color: var(--ons-secondary); }
+
+.ons-notice, .ons-error {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.65rem;
+  background: #eaf2ff;
+  color: #174283;
+  font-size: 0.9rem;
+}
+
+.ons-error { background: #fff0ed; color: #842217; }
+
+@media (max-width: 740px) {
+  .ons-account {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(33rem, calc(100% - 1.5rem));
+    min-height: 0;
+    margin: 1rem auto 2rem;
+    border-radius: 1.2rem;
+  }
+
+  .ons-account-art { min-height: clamp(8.3rem, 37vw, 12rem); border-radius: 1.15rem 1.15rem 0 0; }
+  .ons-art-halo { width: min(37%, 9rem); }
+  .ons-art-grid { background-size: 1.2rem 1.2rem; }
+  .ons-art-platform { top: auto; bottom: 0.7rem; width: 34%; height: 0.65rem; }
+  .ons-art-pixel-bright { top: 24%; right: 32%; width: 1rem; }
+  .ons-art-pixel-small { bottom: 28%; left: 32%; width: 0.55rem; }
+  .ons-account-teacher { width: clamp(7.4rem, 34vw, 11rem); }
+  .ons-account-content { padding: clamp(1.15rem, 6vw, 2.3rem); }
+  .ons-account h1 { margin-bottom: 1.25rem; }
+}
+
+@media (max-width: 740px) and (max-height: 720px) {
+  .ons-account-art { min-height: 7rem; }
+  .ons-account-teacher { width: min(7rem, 29vw); }
+  .ons-account-content { padding-block: 1rem; }
+  .ons-account-methods { gap: 0.8rem; }
+  .ons-account h1 { margin-bottom: 1rem; }
+}

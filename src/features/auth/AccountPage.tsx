@@ -1,4 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { ArrowLeft, ArrowRight, Eye, EyeOff, LogOut } from 'lucide-react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { AccountArtwork } from './AccountArtwork'
+import googleMark from './google-g.png'
+import './account.css'
 
 type Mode = 'signin' | 'signup' | 'verify' | 'forgot' | 'reset'
 type Methods = { email: boolean; google: boolean }
@@ -6,6 +10,11 @@ type Account = { user: { email: string; name: string }; access: { bookVerified: 
 
 const headings: Record<Mode, string> = {
   signin: '로그인', signup: '회원가입', verify: '인증 메일 다시 보내기', forgot: '비밀번호 찾기', reset: '비밀번호 변경',
+}
+const instructions: Partial<Record<Mode, string>> = {
+  signup: '가입한 이메일로 인증 링크를 보내 드립니다.',
+  verify: '가입할 때 입력한 이메일을 사용해 주세요.',
+  forgot: '가입한 이메일로 비밀번호 변경 링크를 보내 드립니다.',
 }
 
 async function post(path: string, body: object) {
@@ -39,6 +48,8 @@ export function AccountPage() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [passwordVisible, setPasswordVisible] = useState(false)
+  const heading = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -64,6 +75,8 @@ export function AccountPage() {
     setMode(next)
     setNotice('')
     setError('')
+    setPasswordVisible(false)
+    requestAnimationFrame(() => heading.current?.focus())
   }
 
   async function run(action: () => Promise<void>) {
@@ -108,7 +121,7 @@ export function AccountPage() {
         setAccount(signedIn)
       } else if (mode === 'reset') {
         setAccount(null)
-        setMode('signin')
+        changeMode('signin')
         setNotice('비밀번호를 변경했습니다. 새 비밀번호로 로그인해 주세요.')
       } else {
         setNotice(mode === 'forgot'
@@ -146,54 +159,88 @@ export function AccountPage() {
   }
 
   const showAccount = account && mode !== 'reset'
+  const showGoogle = methods?.google && mode === 'signin'
+  const passwordField = mode === 'signin' || mode === 'signup' || mode === 'reset'
+  const teacherStage = showAccount && account.access.bookVerified ? 3 : !showAccount && mode === 'signin' ? 1 : 2
   return (
-    <main className="ons-account" aria-busy={busy}>
-      <h1>{showAccount ? '내 계정' : headings[mode]}</h1>
-      {notice && <div className="ons-notice" role="status">{notice}</div>}
-      {error && <div className="ons-error" role="alert">{error}</div>}
-      {showAccount ? (
-        <div className="ons-panel">
-          <p className="ons-identity"><strong>{account.user.name}</strong><span>{account.user.email}</span></p>
-          <p>{account.access.bookVerified && account.access.expiresAt !== null
-            ? `교재 인증 이용권 · ${expiryDate.format(account.access.expiresAt - 1)}까지`
-            : '무료 회원'}</p>
-          {!account.access.bookVerified && (
-            <form onSubmit={submitCode}>
-              <label>교재 인증 코드<input name="code" maxLength={80} required autoComplete="off" /></label>
-              <button type="submit" disabled={busy}>이용권 등록</button>
-            </form>
-          )}
-          <button type="button" className="ons-secondary" disabled={busy} onClick={() => void run(async () => {
-            if (!(await post('/auth/sign-out', {})).ok) throw new Error('Sign-out failed')
-            setAccount(null)
-            setMode('signin')
-            setNotice('로그아웃했습니다.')
-          })}>로그아웃</button>
-        </div>
-      ) : methods ? (
-        <div className="ons-panel">
-          {methods.google && mode === 'signin' && <button type="button" className="ons-secondary" disabled={busy} onClick={googleSignIn}>Google로 로그인</button>}
-          {methods.email && <>
-            <form key={mode} onSubmit={submitAuth}>
-              {mode === 'signup' && <label>표시 이름<input name="name" autoComplete="nickname" maxLength={60} required /></label>}
-              {mode !== 'reset' && <label>이메일<input name="email" type="email" autoComplete="email" maxLength={254} required /></label>}
-              {['signin', 'signup', 'reset'].includes(mode) && (
-                <label>{mode === 'reset' ? '새 비밀번호' : '비밀번호'}
-                  <input name="password" type="password" minLength={mode === 'signin' ? 1 : 12} maxLength={128}
-                    autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} required />
-                </label>
+    <main className="ons-account">
+      <AccountArtwork stage={teacherStage} />
+      <section className="ons-account-content" aria-labelledby="ons-account-heading">
+        <div className="ons-account-form">
+          <h1 id="ons-account-heading" tabIndex={-1} ref={heading}>{showAccount ? '내 계정' : headings[mode]}</h1>
+          {!showAccount && instructions[mode] && <p className="ons-account-hint">{instructions[mode]}</p>}
+          {notice && <div className="ons-notice" role="status">{notice}</div>}
+          {error && <div className="ons-error" role="alert">{error}</div>}
+          {showAccount ? (
+            <div className="ons-identity-panel" aria-busy={busy}>
+              <p className="ons-identity"><strong>{account.user.name}</strong><span>{account.user.email}</span></p>
+              <p>{account.access.bookVerified && account.access.expiresAt !== null
+                ? `교재 인증 이용권 · ${expiryDate.format(account.access.expiresAt - 1)}까지`
+                : '무료 회원'}</p>
+              {!account.access.bookVerified && (
+                <form onSubmit={submitCode}>
+                  <label>교재 인증 코드<input name="code" maxLength={80} required autoComplete="off" /></label>
+                  <button type="submit" className="ons-button" disabled={busy}>이용권 등록</button>
+                </form>
               )}
-              <button type="submit" disabled={busy}>{headings[mode]}</button>
-            </form>
-            <nav className="ons-actions" aria-label="다른 계정 작업">
-              {(mode === 'signin' ? ['signup', 'verify', 'forgot'] as const : ['signin'] as const).map((next) => (
-                <button key={next} type="button" disabled={busy} onClick={() => changeMode(next)}>{headings[next]}</button>
-              ))}
-            </nav>
-          </>}
-          {!methods.email && !methods.google && <p>현재 환경에서는 로그인 설정을 준비하고 있습니다.</p>}
+              <button type="button" className="ons-text-button ons-sign-out" disabled={busy} onClick={() => void run(async () => {
+                if (!(await post('/auth/sign-out', {})).ok) throw new Error('Sign-out failed')
+                setAccount(null)
+                changeMode('signin')
+                setNotice('로그아웃했습니다.')
+              })}><LogOut aria-hidden="true" size={16} />로그아웃</button>
+            </div>
+          ) : methods ? (
+            <div className="ons-account-methods" aria-busy={busy}>
+              {showGoogle && (
+                <button type="button" className="ons-google-button" disabled={busy} onClick={googleSignIn}>
+                  <img src={googleMark} width="20" height="20" alt="" />Google로 로그인
+                </button>
+              )}
+              {showGoogle && methods.email && <p className="ons-account-divider">또는 이메일로</p>}
+              {methods.email && <>
+                <form key={mode} onSubmit={submitAuth}>
+                  {mode === 'signup' && <label>표시 이름<input name="name" autoComplete="nickname" maxLength={60} required /></label>}
+                  {mode !== 'reset' && <label>이메일<input name="email" type="email" autoComplete="email" maxLength={254} autoCapitalize="none" spellCheck={false} required /></label>}
+                  {passwordField && (
+                    <div className="ons-password-field">
+                      <label htmlFor="ons-password">{mode === 'reset' ? '새 비밀번호' : '비밀번호'}</label>
+                      <div className="ons-password-input">
+                        <input id="ons-password" name="password" type={passwordVisible ? 'text' : 'password'}
+                          minLength={mode === 'signin' ? 1 : 12} maxLength={128} spellCheck={false} autoCapitalize="none"
+                          autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                          aria-describedby={mode === 'signin' ? undefined : 'ons-password-hint'} required />
+                        <button type="button" className="ons-password-toggle" aria-controls="ons-password"
+                          aria-label={passwordVisible ? '비밀번호 숨기기' : '비밀번호 표시'} disabled={busy}
+                          onClick={() => setPasswordVisible((visible) => !visible)}>
+                          {passwordVisible ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
+                        </button>
+                      </div>
+                      {mode === 'signin' ? (
+                        <button type="button" className="ons-text-button ons-forgot" disabled={busy} onClick={() => changeMode('forgot')}>비밀번호 찾기</button>
+                      ) : <p id="ons-password-hint" className="ons-field-hint">12자 이상으로 입력해 주세요.</p>}
+                    </div>
+                  )}
+                  <button type="submit" className="ons-button ons-auth-submit" disabled={busy}>
+                    {headings[mode]}<ArrowRight size={17} aria-hidden="true" />
+                  </button>
+                </form>
+                {mode === 'signin' ? (
+                  <nav className="ons-account-links" aria-label="다른 계정 작업">
+                    <div><span>온스가 처음이라면</span><button type="button" className="ons-text-button" disabled={busy} onClick={() => changeMode('signup')}>회원가입</button></div>
+                    <button type="button" className="ons-text-button ons-text-muted" disabled={busy} onClick={() => changeMode('verify')}>인증 메일 다시 보내기</button>
+                  </nav>
+                ) : (
+                  <button type="button" className="ons-text-button ons-return" disabled={busy} onClick={() => changeMode('signin')}>
+                    <ArrowLeft size={16} aria-hidden="true" />로그인으로 돌아가기
+                  </button>
+                )}
+              </>}
+              {!methods.email && !methods.google && <p className="ons-account-hint">현재 환경에서는 로그인 설정을 준비하고 있습니다.</p>}
+            </div>
+          ) : !error ? <p className="ons-account-hint" role="status">계정 정보를 불러오는 중입니다.</p> : null}
         </div>
-      ) : !error ? <p role="status">계정 정보를 불러오는 중입니다.</p> : null}
+      </section>
     </main>
   )
 }

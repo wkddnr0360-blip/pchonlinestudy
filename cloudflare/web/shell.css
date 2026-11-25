@@ -1,90 +1,95 @@
 :root {
-  --ons-blue: #0059c7;
-  --ons-ink: #191a1d;
-  --ons-secondary: #52525b;
-  --ons-border: #b8bdc7;
-  font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", sans-serif;
-  color: var(--ons-ink);
-  background: #f5f5f7;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  color: #191e2c;
+  background: #f5f6fa;
   line-height: 1.55;
   word-break: keep-all;
+  --ons-ink: #191e2c;
+  --ons-secondary: #515c70;
+  --ons-border: #abb4c5;
+  --ons-blue: #1856c5;
+  --ons-blue-hover: #1349a9;
 }
 
-body {
-  margin: 0;
-}
-
-main {
-  width: min(42rem, calc(100% - 3rem));
-  margin: clamp(2rem, 10vh, 7rem) auto;
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(2rem, 7vw, 3.4rem);
-  letter-spacing: -0.045em;
-  line-height: 1.15;
-}
-
-p {
-  color: var(--ons-secondary);
-}
-
-.ons-header {
-  display: flex;
-  padding-inline: max(1.5rem, calc((100vw - 58rem) / 2));
-  justify-content: space-between;
-  background: #fff;
-  border-bottom: 1px solid #e0e1e6;
-}
-
-.ons-header a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 3.5rem;
-  color: var(--ons-ink);
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.ons-account { max-width: 27rem; }
-.ons-account h1 { font-size: clamp(1.9rem, 6vw, 2.65rem); }
-
-.ons-panel {
-  display: grid;
-  gap: 1rem;
-  padding: clamp(1rem, 5vw, 1.75rem);
-  margin-top: 1.25rem;
-  border-radius: 1.15rem;
-  background: #fff;
-  box-shadow: 0 0.5rem 1.5rem #0d23410a;
-}
-
-.ons-panel form, .ons-panel label, .ons-identity { display: grid; gap: 0.5rem; }
-.ons-panel form { gap: 1rem; }
-.ons-panel p { margin: 0; }
-.ons-identity span { overflow-wrap: anywhere; }
-
-.ons-panel input, .ons-panel button, .ons-button {
-  box-sizing: border-box;
-  min-width: 0;
-  min-height: 2.75rem;
-  border-radius: 0.65rem;
-  padding: 0.6rem 0.8rem;
-  font: inherit;
-}
-
-.ons-panel input { width: 100%; border: 1px solid var(--ons-border); color: var(--ons-ink); }
-.ons-panel button, .ons-button { border: 1px solid transparent; background: var(--ons-blue); color: #fff; cursor: pointer; }
-.ons-button { display: inline-flex; align-items: center; text-decoration: none; }
-.ons-panel button.ons-secondary { background: #fff; border-color: var(--ons-border); color: var(--ons-ink); }
-.ons-panel button:disabled { cursor: wait; opacity: 0.68; }
-.ons-actions { display: flex; flex-wrap: wrap; }
-.ons-actions button { background: transparent; color: var(--ons-blue); padding-inline: 0.5rem; }
-.ons-notice, .ons-error { margin-top: 1rem; padding: 0.7rem; border-radius: 0.65rem; background: #e8f2ff; }
-.ons-error { background: #ffece9; color: #78130c; }
+body { margin: 0; }
+button, input { font: inherit; }
+button:disabled { cursor: wait; opacity: 0.68; }
 
 :focus-visible {
   outline: 3px solid var(--ons-blue);
   outline-offset: 3px;
 }
+
+.ons-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4.3rem;
+  padding-inline: max(1rem, calc((100% - 67rem) / 2));
+  border-bottom: 1px solid #e5e8f0;
+  background: #fff;
+}
+
+.ons-header a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.75rem;
+  color: var(--ons-ink);
+  text-decoration: none;
+}
+
+.ons-brand {
+  font-size: 1.0625rem;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.ons-brand img {
+  flex: none;
+  border-radius: 0.62rem;
+  image-rendering: pixelated;
+}
+
+.ons-header .ons-header-action {
+  gap: 0.38rem;
+  color: var(--ons-secondary);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.ons-header .ons-header-action:hover { color: var(--ons-blue); }
+
+.ons-landing {
+  width: min(42rem, calc(100% - 3rem));
+  margin: clamp(3rem, 12vh, 9rem) auto;
+}
+
+.ons-landing h1 {
+  margin: 0;
+  font-size: clamp(2rem, 7vw, 3.4rem);
+  letter-spacing: -0.045em;
+  line-height: 1.16;
+}
+
+.ons-landing p { color: var(--ons-secondary); }
+
+.ons-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  box-sizing: border-box;
+  min-height: 3rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.72rem;
+  background: var(--ons-blue);
+  color: #fff;
+  font-weight: 720;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ons-button:hover:not(:disabled) { background: var(--ons-blue-hover); }
