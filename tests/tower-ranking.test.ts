@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest'
-import { calculateTowerRanks, rankedStagePair, normalStagePair, nextSeasonSeed, type TowerRankInput } from '../src/challenge/ranking-policy'
+import { calculateTowerRanks, rankedStagePair, normalStagePair, normalStagePairForAccess, nextSeasonSeed, type TowerRankInput } from '../src/challenge/ranking-policy'
 
 function users(n: number): TowerRankInput[] {
   return Array.from({ length: n }, (_, i) => ({ userId: String(i).padStart(5, '0'), participated: true,
-    distinctCorrect: 200, bestFloor: 60, achievedAt: i, eligible: true }))
+    distinctCorrect: 200, bestFloor: 60, achievedAt: i, eligible: true, access: 'verified' }))
 }
 test('exclusive upper tiers respect population caps and deterministic ties', () => {
   for (const n of [0, 1, 9, 10, 99, 100, 300, 1000]) {
@@ -61,4 +61,17 @@ test('gold seed grants gold without inventing any correct answers or ranked resu
 test('normal mode only draws stage 1 and 2', () => {
   expect(normalStagePair(() => 0.1)).toEqual([1, 2])
   expect(normalStagePair(() => 0.9)).toEqual([2, 1])
+})
+
+test('free accounts are capped at silver and excluded from competitive population', () => {
+  const paid = users(100)
+  const free: TowerRankInput = { ...paid[0], userId: 'free', access: 'free', distinctCorrect: 999, bestFloor: 999, seededGold: true }
+  const result = calculateTowerRanks([...paid, free])
+  expect(result.population).toBe(100)
+  expect(result.tiers.get('free')).toBe('silver')
+  expect(result.tiers.get('00000')).toBe('diamond')
+  expect(calculateTowerRanks([{ ...free, participated: false }]).tiers.get('free')).toBe('unranked')
+  expect(calculateTowerRanks([{ ...free, distinctCorrect: 1 }]).tiers.get('free')).toBe('bronze')
+  expect(normalStagePairForAccess('free', () => 0.9)).toEqual([1, 1])
+  expect(normalStagePairForAccess('verified', () => 0.9)).toEqual([2, 1])
 })

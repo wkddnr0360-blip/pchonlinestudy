@@ -6,6 +6,8 @@ export type Tier = 'unranked' | 'bronze' | 'silver' | 'gold' | 'platinum' | 'dia
 
 export interface TowerRankInput {
   userId: string
+  /** Current server-validated entitlement; never supplied by the browser. */
+  access: 'free' | 'verified'
   /** At least one valid normal-mode submission in the current ranking season. */
   participated: boolean
   /** Server-derived Gold seed from the previous season's valid peak tier. */
@@ -32,16 +34,17 @@ export function calculateTowerRanks(inputs: readonly TowerRankInput[]) {
       || (x.achievedAt !== null && (!Number.isSafeInteger(x.achievedAt) || x.achievedAt < 0))
       || (x.bestFloor === null) !== (x.achievedAt === null)) throw new Error('Invalid rank input')
   }
-  const active = inputs.filter(x => x.eligible && (x.participated || x.seededGold === true))
-  const population = active.length
+  const active = inputs.filter(x => x.eligible && (x.participated || (x.access === 'verified' && x.seededGold === true)))
+  const ranked = active.filter(x => x.access === 'verified')
+  const population = ranked.length
   const diamondCap = Math.floor(population / 100)
   const upperCap = Math.floor(population / 10)
   const tiers = new Map<string, Tier>(inputs.map(x => [x.userId, 'unranked']))
   for (const x of active) {
-    tiers.set(x.userId, x.seededGold === true || x.distinctCorrect >= initialTowerRules.goldCorrect ? 'gold'
+    tiers.set(x.userId, x.access === 'verified' && (x.seededGold === true || x.distinctCorrect >= initialTowerRules.goldCorrect) ? 'gold'
       : x.distinctCorrect >= initialTowerRules.silverCorrect ? 'silver' : 'bronze')
   }
-  const candidates = active.filter(x => tiers.get(x.userId) === 'gold' && x.bestFloor !== null && x.achievedAt !== null)
+  const candidates = ranked.filter(x => tiers.get(x.userId) === 'gold' && x.bestFloor !== null && x.achievedAt !== null)
     .sort((a, b) => b.bestFloor! - a.bestFloor! || a.achievedAt! - b.achievedAt!
       || (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0))
   let diamond = 0
@@ -70,4 +73,9 @@ export function nextSeasonSeed(peak: Tier): 'gold' | 'unranked' {
 /** Proposed equal mix; normal mode never includes book stage 3. */
 export function normalStagePair(random: () => number = Math.random): readonly [1 | 2, 1 | 2] {
   return random() < 0.5 ? [1, 2] : [2, 1]
+}
+
+/** Free accounts always receive stage 1; verified accounts receive the normal 1/2 pair. */
+export function normalStagePairForAccess(access: TowerRankInput['access'], random: () => number = Math.random): readonly [1 | 2, 1 | 2] {
+  return access === 'verified' ? normalStagePair(random) : [1, 1]
 }
