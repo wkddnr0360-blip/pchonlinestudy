@@ -1,0 +1,46 @@
+.ons-home { width: min(70rem, calc(100% - 2rem)); margin: clamp(1rem, 4.5vw, 3.6rem) auto 3rem; }
+.ons-home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  overflow: hidden;
+  min-height: clamp(24rem, 40vw, 30rem);
+  border: 1px solid #e1daf3;
+  border-radius: clamp(1.25rem, 3vw, 2.1rem);
+  background: #fdfcff;
+  box-shadow: 0 24px 70px -54px #30225d70, 0 8px 24px #3328500a;
+}
+
+.ons-home-copy { display: grid; align-content: center; justify-items: start; padding: clamp(1.75rem, 5vw, 4rem); }
+.ons-home-copy h1 { display: grid; gap: 0.12rem; margin: 0; color: #25223b; font-size: clamp(2.15rem, 5vw, 4.4rem); line-height: 1.15; letter-spacing: -0.069em; font-weight: 785; }
+.ons-home-copy h1 span { color: #634cb6; }
+.ons-home-copy p { max-width: 24rem; margin: 1.05rem 0 1.4rem; color: var(--ons-secondary); font-size: clamp(0.9rem, 1.7vw, 1.1rem); }
+.ons-home-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.45rem 1rem; }
+.ons-home-guide { display: inline-flex; align-items: center; gap: 0.45rem; min-height: 2.75rem; color: #5942a8; text-decoration: none; font-weight: 700; font-size: 0.88rem; }
+.ons-home-guide:hover { text-decoration: underline; }
+
+.ons-home-visual { display: grid; min-width: 0; padding: 0.65rem 0.65rem 0.65rem 0; }
+.ons-home-visual .ons-account-art { border-radius: 1.65rem; }
+.ons-home-visual .ons-account-teacher { width: min(86%, 20rem); }
+.ons-home-visual .ons-art-halo { width: min(70%, 20rem); }
+.ons-home-visual .ons-art-pixel-bright { right: 23%; top: 26%; }
+
+.ons-home-steps { margin-top: clamp(1.45rem, 4vw, 2.8rem); scroll-margin-top: 1rem; }
+.ons-home-steps h2 { display: flex; gap: 0.55rem; align-items: center; margin: 0 0 0.85rem; color: #2c2743; font-size: clamp(1.2rem, 2.5vw, 1.55rem); letter-spacing: -0.047em; }
+.ons-home-steps h2 svg { color: #674eb5; }
+.ons-home-steps ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.72rem; margin: 0; padding: 0; list-style: none; }
+.ons-home-steps li { display: flex; align-items: flex-start; gap: 0.68rem; padding: clamp(0.8rem, 2.5vw, 1.15rem); border: 1px solid #e5e0f0; border-radius: 0.95rem; background: #fff; }
+.ons-step-icon { display: grid; place-items: center; flex: none; width: 2.55rem; height: 2.55rem; border-radius: 0.77rem; }
+.ons-step-lilac { background: #eee6ff; color: #5e42a7; }
+.ons-step-mint { background: #e2f6e9; color: #236951; }
+.ons-step-gold { background: #fff1cf; color: #86530d; }
+.ons-home-steps h3 { margin: 0 0 0.25rem; color: #272238; font-size: 0.95rem; }
+.ons-home-steps p { margin: 0; color: #5d566f; font-size: 0.83rem; }
+
+@media (max-width: 700px) {
+  .ons-home-hero { display: flex; flex-direction: column; min-height: 0; }
+  .ons-home-visual { order: -1; min-height: clamp(10.5rem, 47vw, 15rem); padding: 0.45rem 0.45rem 0; }
+  .ons-home-visual .ons-account-art { border-radius: 0.98rem; }
+  .ons-home-visual .ons-account-teacher { width: clamp(8.2rem, 35vw, 12rem); }
+  .ons-home-visual .ons-art-halo { width: clamp(8rem, 40vw, 12.5rem); }
+  .ons-home-steps ol { grid-template-columns: 1fr; }
+}

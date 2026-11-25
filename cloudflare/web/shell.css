@@ -1,14 +1,14 @@
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  color: #191e2c;
-  background: #f5f6fa;
+  color: #201d33;
+  background: #f7f6fc;
   line-height: 1.55;
   word-break: keep-all;
-  --ons-ink: #191e2c;
-  --ons-secondary: #515c70;
-  --ons-border: #abb4c5;
-  --ons-blue: #1856c5;
-  --ons-blue-hover: #1349a9;
+  --ons-ink: #201d33;
+  --ons-secondary: #5d576e;
+  --ons-border: #b7afc7;
+  --ons-blue: #5740ad;
+  --ons-blue-hover: #483394;
 }
 
 body { margin: 0; }

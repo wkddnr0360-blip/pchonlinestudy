@@ -1,5 +1,13 @@
 # 개발 기록
 
+## 2026-11-26 · 학습자·관리자 UI 개편과 12프레임 황금 티켓
+
+- `cloudflare/web/{OnsHome.tsx,home.css,main.tsx,shell.css}`, `src/features/auth/`에 공통 색·타이포그래피와 Lucide 아이콘을 적용했다. 홈에는 온스 캐릭터, 로그인과 교재 인증 경로를 배치했고 계정 화면에는 입력 종류·회원 상태·구매 사진·티켓의 역할이 보이는 아이콘을 배치했다. 기존 철한쌤 기초 이미지는 원본 그대로 사용한다.
+- `src/features/admin/{PurchaseAdminPage.tsx,PurchaseQueue.tsx,PurchaseReview.tsx,purchase-admin.css}`에 실제 통계와 상태 필터, 닉네임 검색, 표, 상세 검토 패널을 연결했다. `worker/{routes,services}/purchases.ts`, `shared/purchase.ts`, `migrations/0004_purchase_queue_index.sql`에서 D1 집계·검색·조회를 제공한다. 관리자 전용 UI와 Radix Dialog 1.3.1(MIT)은 `/admin`에서 지연 로드한다. shadcn/ui와 Tabler의 목록·상태·사이드바 패턴을 참고했고 기존 Lucide 아이콘 패키지를 재사용했다. [shadcn/ui](https://github.com/shadcn-ui/ui) · [Tabler](https://github.com/tabler/tabler) · [Radix Dialog](https://www.radix-ui.com/primitives/docs/components/dialog)
+- `TicketArt.tsx`에서 112×64 크기의 실제 픽셀 프레임 12개를 새로 그렸다. 금박과 책 문양, 절취선, 녹색 도장, 떨어지는 티켓 조각과 별빛이 바뀐다. 그림은 온스용으로 작성했고 Pixelorama의 프레임 기반 작업 사례를 참고했다. 모션 줄이기에서는 마지막 프레임을 바로 보여준다. 실제 브라우저에서 추출한 GIF는 `.ons2/qa/golden-ticket-motion.gif`다. [Pixelorama](https://github.com/Orama-Interactive/Pixelorama)
+- `scripts/preview_ons2_design.mjs`와 `npm run preview:ons2:design`으로 `http://127.0.0.1:8788`에 합성 미리보기를 제공한다. 실제 이미지를 제출하거나 계정 서비스에 접속하지 않아도 화면과 티켓 동작을 볼 수 있다. 홈·로그인·티켓 등록·관리자 상세를 이 주소에서 실제 Chromium으로 열었다.
+- `npm test` 22개, Workers 런타임 7개, Chromium·WebKit 브라우저 10개, 정적 파일 9개 검증을 통과했다. `0004`를 기존 로컬 D1에도 적용했다. `.ons2/qa/`의 홈, 로그인, 관리자 목록/상세, 모바일 목록, 티켓 캡처를 검토했다. 처음에는 상세 닫기 직후 비동기 포커스 복귀를 기다리지 않았고 작은 화면의 로고 여백이 1px 넘쳤다. 포커스 테스트를 대기형으로 바꾸고 로고 박스 크기를 고친 뒤 320·390px을 확인했다. 외부 Cloudflare 스테이징 및 운영 배포는 미실행이다. 변경 롤백 시 UI와 목록 조회를 되돌리고 검색 인덱스는 유지할 수 있다.
+
 ## 2026-11-26 · P0-B 교재 구매 확인과 1회용 황금 티켓
 
 - `migrations/0003_purchase_review.sql`, `worker/auth/{admin.ts,config.ts}`, `worker/routes/{account.ts,purchases.ts}`, `worker/services/{purchases.ts,book-access.ts}`, `worker/jobs/purchase-photos.ts`에서 신청자 사진·카페 닉네임 제출, 관리자 검토/승인·반려·재제출, 계정 귀속 티켓 발급·재발급·폐기 및 파기를 연결했다. 관리자 권한은 D1에서 요청별로 확인하고 Better Auth 인증 앱 확인은 세션별 15분까지만 인정한다. 티켓은 128비트 난수와 해시를 쓰며, 재발급 시 이전 미사용 티켓을 폐기한다. 조회 화면에는 최근 30개 상태와 날짜만 제공한다. JPEG는 `jpeg-js` 0.4.4로 크기를 제한해 검증하고 메타데이터 없이 재인코딩한다. [Better Auth 2FA](https://better-auth.com/docs/plugins/2fa) · [jpeg-js 라이선스](https://github.com/jpeg-js/jpeg-js#license)

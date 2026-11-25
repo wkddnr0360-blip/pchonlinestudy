@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Eye, EyeOff, LogOut } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BadgeCheck, Eye, EyeOff, KeyRound, LockKeyhole, LogIn, LogOut, Mail, MailCheck, ShieldCheck, Ticket, UserRound, UserRoundPlus } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AccountArtwork } from './AccountArtwork'
 import { TicketArt } from './TicketArt'
@@ -22,6 +22,7 @@ const instructions: Partial<Record<Mode, string>> = {
   verify: '가입할 때 입력한 이메일을 사용해 주세요.',
   forgot: '가입한 이메일로 비밀번호 변경 링크를 보내 드립니다.',
 }
+const headingIcons = { signin: LogIn, signup: UserRoundPlus, verify: MailCheck, forgot: KeyRound, reset: LockKeyhole }
 
 async function post(path: string, body: object) {
   return fetch(`/api/v1${path}`, {
@@ -175,19 +176,23 @@ export function AccountPage() {
   const showGoogle = methods?.google && mode === 'signin'
   const passwordField = mode === 'signin' || mode === 'signup' || mode === 'reset'
   const teacherStage = showAccount && account.access.bookVerified ? 3 : !showAccount && mode === 'signin' ? 1 : 2
+  const HeadingIcon = showAccount ? UserRound : headingIcons[mode]
   return (
     <main className="ons-account">
       <AccountArtwork stage={teacherStage} />
       <section className="ons-account-content" aria-labelledby="ons-account-heading">
         <div className="ons-account-form">
-          <h1 id="ons-account-heading" tabIndex={-1} ref={heading}>{showAccount ? '내 계정' : headings[mode]}</h1>
+          <h1 id="ons-account-heading" tabIndex={-1} ref={heading}>
+            <span className="ons-account-heading-icon"><HeadingIcon size={23} aria-hidden="true" /></span>{showAccount ? '내 계정' : headings[mode]}
+          </h1>
           {!showAccount && instructions[mode] && <p className="ons-account-hint">{instructions[mode]}</p>}
           {notice && <div className="ons-notice" role="status">{notice}</div>}
           {error && <div className="ons-error" role="alert">{error}</div>}
           {showAccount ? (
             <div className="ons-identity-panel" aria-busy={busy}>
               <p className="ons-identity"><strong>{account.user.name}</strong><span>{account.user.email}</span></p>
-              <p>{account.access.bookVerified && account.access.expiresAt !== null
+              <p className="ons-member-label">{account.access.bookVerified ? <BadgeCheck size={17} aria-hidden="true" /> : <UserRound size={17} aria-hidden="true" />}
+                {account.access.bookVerified && account.access.expiresAt !== null
                 ? `교재 인증 이용권 · ${expiryDate.format(account.access.expiresAt - 1)}까지`
                 : '무료 회원'}</p>
               {ticketConsumed && <div className="ons-ticket ons-ticket-used" role="status">
@@ -201,11 +206,11 @@ export function AccountPage() {
                     <TicketArt />
                     <div><strong>교재 인증 티켓</strong><span>내 계정에 발급된 티켓을 등록하세요.</span></div>
                   </div>
-                  <label>티켓 코드<input name="code" maxLength={80} required autoComplete="off" spellCheck={false} /></label>
-                  <button type="submit" className="ons-button" disabled={busy}>티켓 사용</button>
+                  <label>티켓 코드<span className="ons-field-with-icon"><Ticket size={17} aria-hidden="true" /><input name="code" maxLength={80} required autoComplete="off" spellCheck={false} /></span></label>
+                  <button type="submit" className="ons-button" disabled={busy}><Ticket size={17} aria-hidden="true" />티켓 사용</button>
                 </form>
               )}
-              {account.admin && <a href="/admin" className="ons-admin-link">관리자 페이지</a>}
+              {account.admin && <a href="/admin" className="ons-admin-link"><ShieldCheck size={17} aria-hidden="true" />관리자 페이지</a>}
               <button type="button" className="ons-text-button ons-sign-out" disabled={busy} onClick={() => void run(async () => {
                 if (!(await post('/auth/sign-out', {})).ok) throw new Error('Sign-out failed')
                 setAccount(null)
@@ -224,12 +229,13 @@ export function AccountPage() {
               {showGoogle && methods.email && <p className="ons-account-divider">또는 이메일로</p>}
               {methods.email && <>
                 <form key={mode} onSubmit={submitAuth}>
-                  {mode === 'signup' && <label>표시 이름<input name="name" autoComplete="nickname" maxLength={60} required /></label>}
-                  {mode !== 'reset' && <label>이메일<input name="email" type="email" autoComplete="email" maxLength={254} autoCapitalize="none" spellCheck={false} required /></label>}
+                  {mode === 'signup' && <label>표시 이름<span className="ons-field-with-icon"><UserRound size={17} aria-hidden="true" /><input name="name" autoComplete="nickname" maxLength={60} required /></span></label>}
+                  {mode !== 'reset' && <label>이메일<span className="ons-field-with-icon"><Mail size={17} aria-hidden="true" /><input name="email" type="email" autoComplete="email" maxLength={254} autoCapitalize="none" spellCheck={false} required /></span></label>}
                   {passwordField && (
                     <div className="ons-password-field">
                       <label htmlFor="ons-password">{mode === 'reset' ? '새 비밀번호' : '비밀번호'}</label>
-                      <div className="ons-password-input">
+                      <div className="ons-password-input ons-field-with-icon">
+                        <LockKeyhole size={17} aria-hidden="true" />
                         <input id="ons-password" name="password" type={passwordVisible ? 'text' : 'password'}
                           minLength={mode === 'signin' ? 1 : 12} maxLength={128} spellCheck={false} autoCapitalize="none"
                           autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}

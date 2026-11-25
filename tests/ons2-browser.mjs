@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { after, before, beforeEach, test } from 'node:test'
-import { chromium, devices, webkit } from '@playwright/test'
+import { chromium, devices, expect, webkit } from '@playwright/test'
 import { createTestHarness } from 'wrangler'
 
 const workerConfig = {
@@ -44,6 +44,10 @@ for (const width of [320, 390, 768, 1280]) {
     const page = await browser.newPage({ viewport: { width, height: 800 } })
     try {
       await page.goto(baseURL)
+      if (width === 1280) {
+        await page.getByRole('heading', { name: /경찰헌법 OX 학습/ }).waitFor()
+        await page.screenshot({ path: '.ons2/qa/home-1280.png', animations: 'disabled', fullPage: true })
+      }
       await page.getByRole('link', { name: '로그인 및 회원가입' }).click()
       await page.getByRole('heading', { name: '로그인', exact: true }).waitFor()
       const email = page.getByRole('textbox', { name: '이메일' })
@@ -118,6 +122,16 @@ for (const reducedMotion of ['no-preference', 'reduce']) {
       const code = page.getByRole('textbox', { name: '티켓 코드' })
       await code.fill('ABCD1234-ABCD1234-ABCD1234-ABCD1234')
       const initial = await page.locator('.ons-ticket-art').evaluate((canvas) => canvas.toDataURL())
+      if (reducedMotion === 'no-preference') await page.evaluate(() => {
+        const snapshots = new Map()
+        const observer = new MutationObserver(() => {
+          const canvas = document.querySelector('.ons-ticket-used canvas')
+          if (canvas?.dataset.frame) snapshots.set(Number(canvas.dataset.frame), canvas.toDataURL())
+          if (snapshots.has(11)) observer.disconnect()
+        })
+        observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-frame'] })
+        window.onsTicketPreviewFrames = snapshots
+      })
       await page.getByRole('button', { name: '티켓 사용' }).click()
       const used = page.getByRole('status').filter({ hasText: '황금 티켓 사용 완료' })
       await used.waitFor()
@@ -125,15 +139,23 @@ for (const reducedMotion of ['no-preference', 'reduce']) {
       if (reducedMotion === 'no-preference') {
         await page.waitForFunction(() => {
           const frame = Number(document.querySelector('.ons-ticket-used canvas')?.dataset.frame)
-          return frame > 0 && frame < 7
+          return frame > 0 && frame < 11
         })
       } else {
-        assert.equal(await art.getAttribute('data-frame'), '7')
+        assert.equal(await art.getAttribute('data-frame'), '11')
       }
-      await page.locator('.ons-ticket-used canvas[data-frame="7"]').waitFor()
+      await page.locator('.ons-ticket-used canvas[data-frame="11"]').waitFor()
       assert.notEqual(await art.evaluate((canvas) => canvas.toDataURL()), initial)
       assert.equal(await code.count(), 0)
-      if (reducedMotion === 'no-preference') await page.screenshot({ path: '.ons2/qa/golden-ticket.png', animations: 'disabled' })
+      if (reducedMotion === 'no-preference') {
+        await page.screenshot({ path: '.ons2/qa/golden-ticket.png', animations: 'disabled' })
+        const frames = await page.evaluate(() => [...window.onsTicketPreviewFrames.entries()])
+        assert.equal(frames.length, 12)
+        await mkdir('.ons2/qa/ticket-frames', { recursive: true })
+        await Promise.all(frames.map(([frame, png]) => writeFile(
+          `.ons2/qa/ticket-frames/${String(frame).padStart(2, '0')}.png`, Buffer.from(png.split(',')[1], 'base64'),
+        )))
+      }
     } finally {
       await page.close()
     }
@@ -141,27 +163,64 @@ for (const reducedMotion of ['no-preference', 'reduce']) {
 }
 
 test('the admin screen reveals a newly issued ticket once and shows its status', async () => {
-  const page = await browser.newPage({ viewport: { width: 1100, height: 800 } })
+  const page = await browser.newPage({ viewport: { width: 1360, height: 900 } })
   try {
     const now = Date.now()
-    const row = { id: 'synthetic-approved', cafeNickname: '검토된 합성 회원', status: 'approved', submittedAt: now, reviewedAt: now, reviewNote: null, hasPhoto: false, ticket: null }
+    const row = { id: 'synthetic-approved', cafeNickname: '라일락노트', status: 'approved', submittedAt: now, reviewedAt: now, reviewNote: null, hasPhoto: true, ticket: null }
     const ticket = { id: 'synthetic-ticket', issuedAt: now, expiresAt: now + 172800000, redeemedAt: null, revokedAt: null }
     const code = 'ABCD1234-ABCD1234-ABCD1234-ABCD1234'
-    await page.route('**/api/v1/session', (route) => route.fulfill({ json: { admin: { mfaEnabled: true, mfaFresh: true } } }))
-    await page.route('**/api/v1/admin/purchases?page=*', (route) => route.fulfill({ json: { purchases: [row], hasNext: false } }))
+    const entries = [
+      { ...row, id: 'synthetic-pending', cafeNickname: '헌법책첫회독', status: 'pending' },
+      { ...row, id: 'synthetic-pending-2', cafeNickname: '한걸음더', status: 'pending' },
+      row,
+      { ...row, id: 'synthetic-used', cafeNickname: '하루한문제', ticket: { ...ticket, redeemedAt: now } },
+      { ...row, id: 'synthetic-resubmit', cafeNickname: '정리하는수험생', status: 'resubmit' },
+    ]
+    await page.route('**/api/v1/session', (route) => route.fulfill({ json: { user: { name: '합성 관리자' }, admin: { mfaEnabled: true, mfaFresh: true } } }))
+    await page.route('**/api/v1/admin/purchases?*', (route) => {
+      const params = new URL(route.request().url()).searchParams
+      const purchases = entries.filter((entry) => (params.get('status') === 'all' || entry.status === params.get('status'))
+        && entry.cafeNickname.includes(params.get('q') ?? ''))
+      return route.fulfill({ json: { purchases, hasNext: false, total: purchases.length,
+        summary: { total: entries.length, pending: 2, approved: 2, redeemed: 1 } } })
+    })
+    await page.route(`**/api/v1/admin/purchases/${row.id}`, (route) => route.fulfill({ json: { purchase: row } }))
     await page.route(`**/api/v1/admin/purchases/${row.id}/ticket`, async (route) => {
       assert.deepEqual(route.request().postDataJSON(), { expectedTicketId: null })
       row.ticket = ticket
       await route.fulfill({ status: 201, json: { code, ticket } })
     })
-    page.once('dialog', (dialog) => dialog.accept())
     await page.goto(baseURL + '/admin')
-    await page.getByRole('button', { name: '1회용 티켓 발급' }).click()
-    await page.getByText(code, { exact: true }).waitFor()
-    await page.getByRole('button', { name: '티켓 코드 닫기' }).click()
-    assert.equal(await page.getByText(code, { exact: true }).count(), 0)
-    await page.getByText(/최근 티켓 · 발급됨/).waitFor()
+    await page.getByRole('button', { name: '라일락노트 검토 상세' }).waitFor()
     await page.screenshot({ path: '.ons2/qa/purchase-admin.png', animations: 'disabled' })
+    await page.getByRole('button', { name: /검토 대기\s*2/ }).click()
+    await page.getByText('총 2건').waitFor()
+    const search = page.getByRole('searchbox', { name: '카페 닉네임 검색' })
+    await search.fill('헌법')
+    await search.press('Enter')
+    await page.getByText('총 1건').waitFor()
+    await page.getByRole('combobox', { name: '신청 상태 필터' }).selectOption('all')
+    await search.fill('라일락')
+    await search.press('Enter')
+
+    const opener = page.getByRole('button', { name: '라일락노트 검토 상세' })
+    await opener.click()
+    const drawer = page.getByRole('dialog', { name: '라일락노트' })
+    await drawer.getByRole('button', { name: '1회용 티켓 발급' }).click()
+    await drawer.getByRole('button', { name: '확인', exact: true }).click()
+    await drawer.getByText(code, { exact: true }).waitFor()
+    await page.screenshot({ path: '.ons2/qa/purchase-admin-detail.png', animations: 'disabled' })
+    await drawer.getByRole('button', { name: '티켓 코드 닫기' }).click()
+    assert.equal(await page.getByText(code, { exact: true }).count(), 0)
+    await drawer.getByText('발급됨', { exact: true }).waitFor()
+    await page.keyboard.press('Escape')
+    await drawer.waitFor({ state: 'hidden' })
+    await expect(opener).toBeFocused()
+    await page.setViewportSize({ width: 390, height: 800 })
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await page.screenshot({ path: '.ons2/qa/purchase-admin-mobile.png', animations: 'disabled' })
+    await page.setViewportSize({ width: 320, height: 780 })
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
   } finally {
     await page.close()
   }

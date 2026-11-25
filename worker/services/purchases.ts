@@ -1,5 +1,5 @@
 import { decode, encode } from 'jpeg-js'
-import type { AdminPurchase, PurchaseRequest, PurchaseStatus, PurchaseTicket } from '../../shared/purchase'
+import type { AdminPurchase, PurchaseFilter, PurchaseQueue, PurchaseRequest, PurchaseStatus, PurchaseTicket } from '../../shared/purchase'
 import { bookCampaign, createTicketCode, ticketHash } from './book-access'
 
 const photoPrefix = 'verification/'
@@ -61,17 +61,42 @@ type PurchaseRow = PurchaseRequest & {
   revokedAt: number | null
 }
 
-export async function purchaseQueue(db: D1Database, offset: number): Promise<AdminPurchase[]> {
-  const { results } = await db.prepare(`
-    SELECT ${requestColumns}, req.photo_key AS photoKey, code.id AS codeId,
-      code.issued_at AS issuedAt, code.expires_at AS expiresAt, code.redeemed_at AS redeemedAt, code.revoked_at AS revokedAt
-    FROM purchase_requests req LEFT JOIN access_codes code ON code.id = req.last_code_id
-    ORDER BY CASE req.status WHEN 'pending' THEN 0 ELSE 1 END, req.submitted_at DESC, req.id DESC LIMIT 21 OFFSET ?
-  `).bind(offset).all<PurchaseRow>()
-  return results.map(({ photoKey, codeId, issuedAt, expiresAt, redeemedAt, revokedAt, ...request }) => ({
+const joins = 'FROM purchase_requests req LEFT JOIN access_codes code ON code.id = req.last_code_id'
+const columns = `${requestColumns}, req.photo_key AS photoKey, code.id AS codeId,
+  code.issued_at AS issuedAt, code.expires_at AS expiresAt, code.redeemed_at AS redeemedAt, code.revoked_at AS revokedAt`
+
+function toAdminPurchase({ photoKey, codeId, issuedAt, expiresAt, redeemedAt, revokedAt, ...request }: PurchaseRow): AdminPurchase {
+  return {
     ...request, hasPhoto: photoKey !== null,
     ticket: codeId && issuedAt !== null && expiresAt !== null ? { id: codeId, issuedAt, expiresAt, redeemedAt, revokedAt } : null,
-  }))
+  }
+}
+
+export async function adminPurchaseById(db: D1Database, requestId: string) {
+  const row = await db.prepare(`SELECT ${columns} ${joins} WHERE req.id = ? AND req.campaign_id = ?`)
+    .bind(requestId, bookCampaign).first<PurchaseRow>()
+  return row ? toAdminPurchase(row) : null
+}
+
+export async function purchaseQueue(db: D1Database, offset: number, filter: PurchaseFilter, search: string): Promise<PurchaseQueue> {
+  const where = `WHERE req.campaign_id = ? AND (? = '' OR instr(lower(req.cafe_nickname), lower(?)) > 0)
+    AND (? = 'all' OR req.status = ? OR (? = 'redeemed' AND code.redeemed_at IS NOT NULL))`
+  const args = [bookCampaign, search, search, filter, filter, filter]
+  const [rows, totals, counts] = await db.batch([
+    db.prepare(`SELECT ${columns} ${joins} ${where}
+      ORDER BY CASE req.status WHEN 'pending' THEN 0 ELSE 1 END, req.submitted_at DESC, req.id DESC LIMIT 20 OFFSET ?`)
+      .bind(...args, offset),
+    db.prepare(`SELECT COUNT(*) AS total ${joins} ${where}`).bind(...args),
+    db.prepare(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE req.status = 'pending') AS pending,
+      COUNT(*) FILTER (WHERE req.status = 'approved') AS approved,
+      COUNT(code.redeemed_at) AS redeemed ${joins} WHERE req.campaign_id = ?`).bind(bookCampaign),
+  ])
+  const { total } = totals.results[0] as { total: number }
+  return {
+    purchases: (rows.results as PurchaseRow[]).map(toAdminPurchase),
+    total, hasNext: offset + 20 < total,
+    summary: counts.results[0] as PurchaseQueue['summary'],
+  }
 }
 
 export async function ticketHistory(db: D1Database, requestId: string) {

@@ -1,3 +1,4 @@
+import { Camera, Send } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { purchaseStatusLabel, type PurchaseRequest } from '../../../shared/purchase'
 
@@ -63,7 +64,7 @@ export function PurchaseForm() {
 
   const canSubmit = purchase === null || purchase?.status === 'resubmit' || purchase?.status === 'rejected'
   return <section className="ons-purchase" aria-labelledby="ons-purchase-heading">
-    <h2 id="ons-purchase-heading">교재 구매 인증</h2>
+    <h2 id="ons-purchase-heading"><Camera size={18} aria-hidden="true" />교재 구매 인증</h2>
     {error && <p className="ons-error" role="alert">{error}</p>}
     {purchase && <div className="ons-purchase-state" role="status">
       <strong>{purchaseStatusLabel[purchase.status]}</strong>
@@ -78,7 +79,7 @@ export function PurchaseForm() {
         setPreview(file && file.size <= 20 * 1024 * 1024 ? URL.createObjectURL(file) : undefined)
       }} /></label>
       {preview && <img className="ons-purchase-photo" src={preview} alt="제출할 교재 사진" />}
-      <button type="submit" className="ons-button" disabled={busy}>{busy ? '제출 중' : '구매 인증 신청'}</button>
+      <button type="submit" className="ons-button" disabled={busy}><Send size={16} aria-hidden="true" />{busy ? '제출 중' : '구매 인증 신청'}</button>
     </form>}
     {purchase === undefined && !error && <p role="status">인증 상태를 확인하고 있습니다.</p>}
   </section>

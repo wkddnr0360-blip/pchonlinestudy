@@ -1,14 +1,17 @@
 import type { AppEnv } from '../index'
+import type { PurchaseFilter } from '../../shared/purchase'
 import { json, readLimitedBody, readSmallJson } from '../http'
 import { readMemberAccess } from '../services/book-access'
-import { cleanPurchasePhoto, createPurchase, issueTicket, latestPurchase, photoSizeLimit, purchasePhoto, purchaseQueue, reviewPurchase, revokeTicket, ticketHistory } from '../services/purchases'
+import { adminPurchaseById, cleanPurchasePhoto, createPurchase, issueTicket, latestPurchase, photoSizeLimit, purchasePhoto, purchaseQueue, reviewPurchase, revokeTicket, ticketHistory } from '../services/purchases'
 
 export const purchasePath = '/api/v1/purchase'
 export const adminPrefix = '/api/v1/admin/'
 const idPattern = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}'
 const purchaseAction = new RegExp(`^/api/v1/admin/purchases/(${idPattern})/(photo|review|ticket|tickets)$`)
+const purchaseDetail = new RegExp(`^/api/v1/admin/purchases/(${idPattern})$`)
 const ticketAction = new RegExp(`^/api/v1/admin/tickets/(${idPattern})/revoke$`)
 const purchaseId = new RegExp(`^${idPattern}$`)
+const purchaseFilters = new Set<PurchaseFilter>(['all', 'pending', 'approved', 'rejected', 'resubmit', 'redeemed'])
 
 function fields(data: unknown): Record<string, unknown> | null {
   return data && typeof data === 'object' && !Array.isArray(data) ? data as Record<string, unknown> : null
@@ -46,9 +49,17 @@ export async function adminPurchaseRoute(request: Request, env: AppEnv, url: URL
   const { pathname, searchParams } = url
   if (request.method === 'GET' && pathname === adminPrefix + 'purchases') {
     const page = Number(searchParams.get('page') ?? '1')
-    if (!Number.isSafeInteger(page) || page < 1 || page > 500) return json({ error: 'invalid_input' }, 400)
-    const rows = await purchaseQueue(env.DB, (page - 1) * 20)
-    return json({ purchases: rows.slice(0, 20), hasNext: rows.length > 20 }, 200)
+    const filter = (searchParams.get('status') ?? 'all') as PurchaseFilter
+    const search = (searchParams.get('q') ?? '').trim()
+    if (!Number.isSafeInteger(page) || page < 1 || page > 500 || !purchaseFilters.has(filter) || search.length > 60) {
+      return json({ error: 'invalid_input' }, 400)
+    }
+    return json(await purchaseQueue(env.DB, (page - 1) * 20, filter, search), 200)
+  }
+  const detail = pathname.match(purchaseDetail)
+  if (request.method === 'GET' && detail) {
+    const purchase = await adminPurchaseById(env.DB, detail[1])
+    return purchase ? json({ purchase }, 200) : json({ error: 'not_found' }, 404)
   }
 
   const action = pathname.match(purchaseAction)

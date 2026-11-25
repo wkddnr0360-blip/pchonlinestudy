@@ -22,6 +22,15 @@ export interface AdminPurchase extends PurchaseRequest {
   ticket: PurchaseTicket | null
 }
 
+export type PurchaseFilter = PurchaseStatus | 'all' | 'redeemed'
+
+export interface PurchaseQueue {
+  purchases: AdminPurchase[]
+  hasNext: boolean
+  total: number
+  summary: { total: number; pending: number; approved: number; redeemed: number }
+}
+
 export const purchaseStatusLabel: Record<PurchaseStatus, string> = {
   pending: '검토 대기', approved: '승인', rejected: '반려', resubmit: '재제출 요청',
 }
