@@ -1,6 +1,7 @@
 import type { AppEnv } from '../index'
 import { getAdminAccess, recordAdminMfa } from '../auth/admin'
 import { authPath, authRoute, authSettings, createAuth, enableMfaPath, verifyMfaPath } from '../auth/config'
+import { isKakaoAccountAddress } from '../auth/kakao'
 import { json, privateHeaders, readSmallJson } from '../http'
 import { readMemberAccess, redeemAccessCode } from '../services/book-access'
 import { adminPrefix, adminPurchaseRoute, memberPurchaseRoute, purchasePath } from './purchases'
@@ -16,7 +17,7 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
   const path = url.pathname
   const settings = authSettings(env)
   if (method === 'GET' && path === '/api/v1/auth-methods') {
-    return json({ email: settings?.email ?? false, google: settings?.google ?? false, ...(settings?.testMail ? { localMail: true } : {}) }, 200)
+    return json({ email: settings?.email ?? false, google: settings?.google ?? false, kakao: Boolean(settings?.kakao), ...(settings?.testMail ? { localMail: true } : {}) }, 200)
   }
   const libraryRoute = path.startsWith(authPath + '/')
   const adminRoute = path.startsWith(adminPrefix)
@@ -79,18 +80,23 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
     }
 
     const session = await auth.api.getSession({ headers: request.headers })
-    if (!session?.user.emailVerified) return json({ error: 'login_required' }, 401, method)
+    if (!session) return json({ error: 'login_required' }, 401, method)
     const { id, email, name } = session.user
+    const kakaoMember = isKakaoAccountAddress(email)
+    const verified = kakaoMember
+      ? await env.DB.prepare("SELECT 1 FROM account WHERE userId = ? AND providerId = 'kakao'").bind(id).first()
+      : session.user.emailVerified
+    if (!verified) return json({ error: 'login_required' }, 401, method)
     const suspended = await env.DB.prepare('SELECT 1 FROM member_controls WHERE user_id = ? AND suspended_at IS NOT NULL')
       .bind(id).first()
     if (suspended) return json({ error: 'account_suspended' }, 403, method)
     if (study) return await studyRoute(request, env, url, id)
     if (exam) return await examRoute(request, env.DB, url, id)
 
-    const admin = (readSession || adminRoute)
+    const admin = !kakaoMember && (readSession || adminRoute)
       ? await getAdminAccess(env.DB, id, session.session.id, Boolean(session.user.twoFactorEnabled))
       : null
-    if (readSession) return json({ user: { id, email, name }, access: await readMemberAccess(env.DB, id, Date.now()), admin }, 200, method)
+    if (readSession) return json({ user: { id, email: kakaoMember ? null : email, name }, access: await readMemberAccess(env.DB, id, Date.now()), admin }, 200, method)
     if (adminRoute) {
       if (!admin) return json({ error: 'forbidden' }, 403, method)
       if (!admin.mfaFresh) return json({ error: 'mfa_required' }, 403, method)

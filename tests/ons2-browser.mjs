@@ -13,6 +13,8 @@ const workerConfig = {
     BETTER_AUTH_SECRET: randomBytes(32).toString('base64url'),
     GOOGLE_CLIENT_ID: 'synthetic-ons2.apps.googleusercontent.com',
     GOOGLE_CLIENT_SECRET: randomBytes(32).toString('base64url'),
+    KAKAO_CLIENT_ID: 'synthetic-kakao-rest-key',
+    KAKAO_CLIENT_SECRET: randomBytes(32).toString('base64url'),
   },
 }
 const harness = createTestHarness({ workers: [workerConfig] })
@@ -39,6 +41,29 @@ after(async () => {
 beforeEach(async () => {
   const env = await harness.getWorker().getEnv()
   await env.DB.prepare('DELETE FROM auth_rate_limits').run()
+})
+
+test('the mobile social login shows Kakao and Google and starts Kakao without email', async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  try {
+    await page.route('**/api/v1/auth-methods', (route) => route.fulfill({ json: { kakao: true, google: true, email: false } }))
+    await page.route('https://kauth.kakao.com/oauth/authorize?**', (route) => route.fulfill({ body: 'Synthetic Kakao sign-in' }))
+    await page.goto(baseURL + '/account')
+    const kakao = page.getByRole('button', { name: '카카오 로그인' })
+    await expect(kakao).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Google로 로그인' })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: '이메일' })).toHaveCount(0)
+    await kakao.locator('img').evaluate((image) => image.decode())
+    await page.screenshot({ path: '.ons2/qa/kakao-sign-in-390.png', animations: 'disabled' })
+    await kakao.focus()
+    await page.keyboard.press('Enter')
+    await page.waitForURL('https://kauth.kakao.com/oauth/authorize?**')
+    const redirect = new URL(page.url())
+    assert.equal(redirect.searchParams.get('redirect_uri'), baseURL + '/api/v1/auth/callback/kakao')
+    assert.equal(redirect.searchParams.get('scope'), 'profile_nickname')
+  } finally {
+    await page.close()
+  }
 })
 
 test('a mobile learner signs up, solves an OX question and opens the verified exam', async () => {
@@ -437,8 +462,9 @@ test('login and password recovery are usable in iPhone-sized WebKit', async () =
     await page.getByRole('button', { name: 'Google로 로그인' }).waitFor()
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
     const login = page.getByRole('button', { name: '로그인', exact: true })
-    assert.equal(await login.evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight), true)
     await page.screenshot({ path: '.ons2/qa/account-iphone-webkit.png', animations: 'disabled' })
+    const { bottom, height } = await login.evaluate((button) => ({ bottom: button.getBoundingClientRect().bottom, height: innerHeight }))
+    assert.ok(bottom <= height, `Email submit button ends at ${bottom}px in a ${height}px viewport`)
     await page.getByRole('button', { name: '비밀번호 찾기' }).click()
     await page.getByRole('heading', { name: '비밀번호 찾기', exact: true }).waitFor()
     assert.equal(await page.getByRole('textbox', { name: '이메일' }).isVisible(), true)

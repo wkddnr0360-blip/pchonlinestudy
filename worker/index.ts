@@ -14,6 +14,8 @@ export interface AppEnv {
   BETTER_AUTH_SECRET?: string
   GOOGLE_CLIENT_ID?: string
   GOOGLE_CLIENT_SECRET?: string
+  KAKAO_CLIENT_ID?: string
+  KAKAO_CLIENT_SECRET?: string
   RESEND_API_KEY?: string
   MAIL_FROM?: string
   AUTH_EMAIL_MODE?: string

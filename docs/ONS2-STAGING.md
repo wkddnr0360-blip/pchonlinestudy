@@ -35,6 +35,16 @@ npm run dev:ons2
 3. `APP_ORIGIN`에 스테이징의 HTTPS 원점을 입력한다. Google Cloud에서 테스트용 OAuth 웹 클라이언트를 만들고 `https://<스테이징 호스트>/api/v1/auth/callback/google`을 승인된 리디렉션 URI로 등록한다. 현재 로그인에 요청하는 `openid`, `email`, `profile`만 사용하면 Google 테스트 사용자 등록은 생략할 수 있다. 이메일 인증과 재설정에 사용할 발신 도메인은 Resend에서 검증한다. 앱 Worker에 `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `MAIL_FROM`을 각각 `npx wrangler secret put <이름> --config cloudflare/wrangler.staging.jsonc`로 등록한다. [Google OAuth 게시 상태](https://support.google.com/cloud/answer/15549945) · [Resend 발신 도메인](https://resend.com/docs/dashboard/domains/introduction) · [Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
 4. 배포 전에 `npm run build:ons2`로 정적 파일 검사까지 실행하고, 스테이징 리소스 이름과 바인딩을 대조한다. 스테이징이 활성화되면 마이그레이션을 적용하고 Cloudflare Access 등에서 허용한 테스트 계정으로 Google 콜백, Resend 발송, 권한 회수, 만료, 직접 경로, 캐시를 확인한다. 결과는 DEVLOG에 기록한다. 운영 도메인과 Pages 이전은 별도 승인 뒤 진행한다.
 
+### 카카오 로그인 연결
+
+1. 카카오디벨로퍼스에서 온스 개발용 앱을 선택하고 카카오 로그인을 사용 설정한다. REST API 키의 카카오 로그인 리다이렉트 URI에 `https://pch-ons2-staging.wkddnr0360.workers.dev/api/v1/auth/callback/kakao`를 등록한다. 닉네임(`profile_nickname`) 동의항목을 설정한다. [카카오 로그인 설정](https://developers.kakao.com/docs/ko/kakaologin/prerequisite)
+2. REST API 키와 클라이언트 시크릿을 스테이징 Worker의 `KAKAO_CLIENT_ID`와 `KAKAO_CLIENT_SECRET` 시크릿으로 각각 등록한다. `npx wrangler secret put <이름> --config cloudflare/wrangler.staging.jsonc`가 표시하는 프롬프트에 입력한다. 두 시크릿이 설정되면 `/api/v1/auth-methods`의 `kakao`가 `true`가 되고 계정 화면에 버튼이 나타난다. [Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
+3. 카카오 계정으로 첫 로그인과 로그아웃 뒤 재로그인, 1단계 학습과 같은 계정의 교재 티켓 등록을 확인한다. 카카오 계정의 이메일은 요청하지 않는다. `user.email`의 내부 `.invalid` 값은 Better Auth 호환용이고, 회원 인증은 `account`의 카카오 계정으로 확인한다. 화면이나 메일에 내부 주소를 사용하지 않는다. 연결된 카카오 앱을 교체하면 앱별 회원번호가 달라지므로 별도의 계정 이관이 필요하다. [카카오 회원번호](https://developers.kakao.com/docs/ko/kakaologin/common)
+
+### Cloudflare 이메일 발송 조건
+
+2026-11-26에 온보딩 화면에서 발신에 선택할 수 있는 존이 없음을 확인했다. 계정에서 `onstudy.kro.kr`의 DNS 존을 찾지 못했고, `kro.kr`은 공개 접미사 목록에 없다. 도메인 등록 경로와 네임서버 제어를 확보한 뒤부터 발송 전환을 진행할 수 있다. Free는 Cloudflare 계정에서 사전 확인한 수신 주소에만 발송한다. 일반 회원 가입에는 Workers Paid도 필요하다. 도메인을 준비한 뒤 기존 Better Auth와 D1을 사용하면서 발송 함수에 Cloudflare `send_email` 바인딩을 연결할 수 있다. [DNS 도메인 등록](https://developers.cloudflare.com/fundamentals/manage-domains/add-site/) · [이메일 발송 요금](https://developers.cloudflare.com/email-service/platform/pricing/) · [회원가입 발송 예제](https://developers.cloudflare.com/email-service/examples/email-sending/signup-flow/)
+
 ## 기존 교재 노출 대응
 
 - 교재 JSON 28개는 2026-11-25 GitHub 브랜치 4개의 이력에서 제거했다. 브랜치 이름과 교재 이외 파일은 보존했다. 현재 브랜치의 교재 경로에 다시 커밋하지 않도록 개발 브랜치에 `.gitignore`와 CI 검사를 추가했다. 이전 이력에서 받은 복제본은 깨끗한 재복제를 사용한다.

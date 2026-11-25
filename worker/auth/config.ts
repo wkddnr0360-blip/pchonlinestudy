@@ -1,6 +1,8 @@
 import { betterAuth } from 'better-auth'
+import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { twoFactor } from 'better-auth/plugins/two-factor'
 import type { AppEnv } from '../index'
+import { isKakaoAccountAddress, mapKakaoProfile } from './kakao'
 
 export const authPath = '/api/v1/auth'
 
@@ -8,7 +10,6 @@ const emailRoutes = new Set([
   'POST /sign-up/email', 'POST /sign-in/email', 'POST /send-verification-email',
   'GET /verify-email', 'POST /request-password-reset', 'POST /reset-password',
 ])
-const googleRoutes = new Set(['POST /sign-in/social', 'GET /callback/google'])
 export const enableMfaPath = authPath + '/two-factor/enable'
 export const verifyMfaPath = authPath + '/two-factor/verify-totp'
 
@@ -27,12 +28,15 @@ export function authSettings(env: AppEnv) {
   const testMail = loopback && env.AUTH_EMAIL_MODE === 'fixtures'
   const email = testMail || Boolean(env.RESEND_API_KEY && env.MAIL_FROM)
   const google = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)
-  return { origin: origin.origin, email, google, testMail }
+  const kakao = env.KAKAO_CLIENT_ID && env.KAKAO_CLIENT_SECRET
+    ? { clientId: env.KAKAO_CLIENT_ID, clientSecret: env.KAKAO_CLIENT_SECRET } : null
+  return { origin: origin.origin, email, google, kakao, testMail }
 }
 
 type AuthSettings = NonNullable<ReturnType<typeof authSettings>>
 
 async function sendAccountEmail(env: AppEnv, settings: AuthSettings, kind: 'verify' | 'reset', email: string, url: string, onLocalMail?: (url: string) => void) {
+  if (!settings.email || isKakaoAccountAddress(email)) return
   if (settings.testMail) {
     if (!email.endsWith('@example.test')) throw new Error('Synthetic email address required')
     await env.DB.batch([
@@ -63,17 +67,36 @@ export function createAuth(env: AppEnv, settings: AuthSettings, onLocalMail?: (u
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: [settings.origin],
     logger: { disabled: true },
+    onAPIError: { errorURL: `${settings.origin}/account` },
     advanced: { useSecureCookies: settings.origin.startsWith('https:'), ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] } },
     session: { expiresIn: 60 * 60 * 24 * 7, cookieCache: { enabled: false } },
     verification: { storeIdentifier: 'hashed' },
     account: { accountLinking: { enabled: false }, encryptOAuthTokens: true },
     plugins: [twoFactor()],
-    socialProviders: settings.google ? {
-      google: {
-        clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET!,
-        disableIdTokenSignIn: true, includeGrantedScopes: false, prompt: 'select_account',
-      },
-    } : {},
+    socialProviders: {
+      ...(settings.google ? {
+        google: {
+          clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET!,
+          disableIdTokenSignIn: true, includeGrantedScopes: false, prompt: 'select_account',
+        },
+      } : {}),
+      ...(settings.kakao ? {
+        kakao: {
+          ...settings.kakao, disableIdTokenSignIn: true, disableDefaultScope: true,
+          scope: ['profile_nickname'], mapProfileToUser: mapKakaoProfile,
+        },
+      } : {}),
+    },
+    hooks: {
+      before: createAuthMiddleware(async (context) => {
+        if (context.path === '/sign-up/email' && typeof context.body?.email === 'string' && isKakaoAccountAddress(context.body.email)) {
+          throw new APIError('BAD_REQUEST', { message: 'Email address is reserved' })
+        }
+        if (context.path === '/sign-in/social' && context.body?.provider === 'kakao' && context.body.scopes?.length) {
+          throw new APIError('BAD_REQUEST', { message: 'Additional Kakao scopes are unavailable' })
+        }
+      }),
+    },
     emailAndPassword: {
       enabled: settings.email,
       autoSignIn: false,
@@ -120,5 +143,7 @@ export function authRoute(settings: AuthSettings, method: string, path: string) 
   return route === 'POST /sign-out'
     || (settings.email && method === 'POST' && [enableMfaPath, verifyMfaPath].includes(path))
     || (settings.email && (emailRoutes.has(route) || /^GET \/reset-password\/[a-zA-Z0-9_-]{16,128}$/.test(route)))
-    || (settings.google && googleRoutes.has(route))
+    || ((settings.google || settings.kakao !== null) && route === 'POST /sign-in/social')
+    || (settings.google && route === 'GET /callback/google')
+    || (settings.kakao !== null && route === 'GET /callback/kakao')
 }

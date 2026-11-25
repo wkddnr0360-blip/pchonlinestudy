@@ -5,12 +5,13 @@ import { TicketArt } from './TicketArt'
 import { PurchaseForm } from './PurchaseForm'
 import { studyReturnFromQuery } from '../study/navigation'
 import googleMark from './google-g.png'
+import kakaoButton from './kakao-login.png'
 import './account.css'
 
 type Mode = 'signin' | 'signup' | 'verify' | 'forgot' | 'reset'
-type Methods = { email: boolean; google: boolean; localMail?: boolean }
+type Methods = { email: boolean; google: boolean; kakao: boolean; localMail?: boolean }
 type Account = {
-  user: { id: string; email: string; name: string }
+  user: { id: string; email: string | null; name: string }
   access: { bookVerified: boolean; expiresAt: number | null }
   admin?: { mfaEnabled: boolean; mfaFresh: boolean } | null
 }
@@ -47,6 +48,7 @@ const authActions = {
 } as const
 
 const expiryDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeZone: 'Asia/Seoul' })
+const socialOrigins = { google: 'https://accounts.google.com', kakao: 'https://kauth.kakao.com' } as const
 
 export function AccountPage() {
   const [studyTarget] = useState(() => {
@@ -81,6 +83,7 @@ export function AccountPage() {
     ]).then(([nextAccount, nextMethods]) => {
       setAccount(nextAccount)
       setMethods(nextMethods)
+      if (!nextMethods.email) setMode('signin')
     }).catch((failure) => {
       if (failure.name !== 'AbortError') setError('계정 상태를 불러오지 못했습니다. 잠시 후 다시 열어 주세요.')
     })
@@ -172,25 +175,27 @@ export function AccountPage() {
     })
   }
 
-  function googleSignIn() {
+  function socialSignIn(provider: keyof typeof socialOrigins) {
     void run(async () => {
       const result = await post('/auth/sign-in/social', {
-        provider: 'google', callbackURL: accountCallback, disableRedirect: true,
+        provider, callbackURL: accountCallback, disableRedirect: true,
       })
-      if (!result.ok) throw new Error('Google sign-in unavailable')
+      if (!result.ok) throw new Error('Social sign-in unavailable')
       const target = new URL((await result.json()).url)
-      if (target.origin !== 'https://accounts.google.com') throw new Error('Invalid Google URL')
+      if (target.origin !== socialOrigins[provider]) throw new Error('Invalid sign-in URL')
       location.assign(target.href)
     })
   }
 
   const showAccount = account && mode !== 'reset'
   const showGoogle = methods?.google && mode === 'signin'
+  const showKakao = methods?.kakao && mode === 'signin'
+  const compact = !showAccount && showKakao && methods?.email
   const passwordField = mode === 'signin' || mode === 'signup' || mode === 'reset'
   const teacherStage = showAccount && account.access.bookVerified ? 3 : !showAccount && mode === 'signin' ? 1 : 2
   const HeadingIcon = showAccount ? UserRound : headingIcons[mode]
   return (
-    <main className="ons-account">
+    <main className={compact ? 'ons-account ons-account-compact' : 'ons-account'}>
       <AccountArtwork stage={teacherStage} />
       <section className="ons-account-content" aria-labelledby="ons-account-heading">
         <div className="ons-account-form">
@@ -204,7 +209,7 @@ export function AccountPage() {
           {error && <div className="ons-error" role="alert">{error}</div>}
           {showAccount ? (
             <div className="ons-identity-panel" aria-busy={busy}>
-              <p className="ons-identity"><strong>{account.user.name}</strong><span>{account.user.email}</span></p>
+              <p className="ons-identity"><strong>{account.user.name}</strong><span>{account.user.email ?? '카카오 계정'}</span></p>
               <p className="ons-member-label">{account.access.bookVerified ? <BadgeCheck size={17} aria-hidden="true" /> : <UserRound size={17} aria-hidden="true" />}
                 {account.access.bookVerified && account.access.expiresAt !== null
                 ? `교재 인증 이용권 · ${expiryDate.format(account.access.expiresAt - 1)}까지`
@@ -237,12 +242,17 @@ export function AccountPage() {
             </div>
           ) : methods ? (
             <div className="ons-account-methods" aria-busy={busy}>
+              {showKakao && (
+                <button type="button" className="ons-kakao-button" disabled={busy} onClick={() => socialSignIn('kakao')}>
+                  <img src={kakaoButton} width="224" height="46" alt="카카오 로그인" />
+                </button>
+              )}
               {showGoogle && (
-                <button type="button" className="ons-google-button" disabled={busy} onClick={googleSignIn}>
+                <button type="button" className="ons-google-button" disabled={busy} onClick={() => socialSignIn('google')}>
                   <img src={googleMark} width="20" height="20" alt="" />Google로 로그인
                 </button>
               )}
-              {showGoogle && methods.email && <p className="ons-account-divider">또는 이메일로</p>}
+              {(showKakao || showGoogle) && methods.email && <p className="ons-account-divider">또는 이메일로</p>}
               {methods.email && <>
                 <form key={mode} onSubmit={submitAuth}>
                   {mode === 'signup' && <label>표시 이름<span className="ons-field-with-icon"><UserRound size={17} aria-hidden="true" /><input name="name" autoComplete="nickname" maxLength={60} required /></span></label>}
@@ -282,7 +292,7 @@ export function AccountPage() {
                   </button>
                 )}
               </>}
-              {!methods.email && !methods.google && <p className="ons-account-hint">현재 환경에서는 로그인 설정을 준비하고 있습니다.</p>}
+              {!methods.email && !methods.google && !methods.kakao && <p className="ons-account-hint">현재 환경에서는 로그인 설정을 준비하고 있습니다.</p>}
             </div>
           ) : !error ? <p className="ons-account-hint" role="status">계정 정보를 불러오는 중입니다.</p> : null}
         </div>

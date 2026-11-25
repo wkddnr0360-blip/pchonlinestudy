@@ -2,11 +2,14 @@ import assert from 'node:assert/strict'
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { after, before, beforeEach, test } from 'node:test'
 import { decode, encode } from 'jpeg-js'
+import { createServer } from 'vite'
 import { createTestHarness } from 'wrangler'
 import { seedSyntheticBook } from './ons2-book-fixture.mjs'
 
 const origin = 'http://127.0.0.1:8787'
 const fixtureClient = 'synthetic-ons2.apps.googleusercontent.com'
+const fixtureKakaoClient = 'synthetic-kakao-rest-key'
+const campaign = 'ons-season-5'
 const harness = createTestHarness({
   workers: [{
     configPath: './cloudflare/wrangler.local.jsonc',
@@ -15,6 +18,8 @@ const harness = createTestHarness({
       BETTER_AUTH_SECRET: randomBytes(32).toString('base64url'),
       GOOGLE_CLIENT_ID: fixtureClient,
       GOOGLE_CLIENT_SECRET: randomBytes(32).toString('base64url'),
+      KAKAO_CLIENT_ID: fixtureKakaoClient,
+      KAKAO_CLIENT_SECRET: randomBytes(32).toString('base64url'),
     },
   }],
 })
@@ -65,6 +70,23 @@ function cookieFrom(response, name) {
   const value = response.headers.getSetCookie().find((entry) => entry.includes(name + '='))
   assert.ok(value)
   return value.split(';')[0]
+}
+
+async function issueFixtureTicket(userId) {
+  const requestId = randomUUID()
+  const codeId = randomUUID()
+  const now = Date.now()
+  const code = randomBytes(16).toString('hex').toUpperCase()
+  const hash = createHash('sha256').update(code).digest('hex')
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO purchase_requests (id, user_id, campaign_id, cafe_nickname, status, submitted_at, reviewed_at)
+      VALUES (?, ?, ?, '합성 닉네임', 'approved', ?, ?)`)
+      .bind(requestId, userId, campaign, now, now),
+    env.DB.prepare(`INSERT INTO access_codes (id, request_id, user_id, campaign_id, code_hash, issued_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .bind(codeId, requestId, userId, campaign, hash, now, now + 60_000),
+  ])
+  return { code, codeId }
 }
 
 function totp(uri) {
@@ -195,6 +217,83 @@ test('Google OAuth begins with a new state and S256 challenge; wrong origins are
   assert.ok(redirect.searchParams.get('code_challenge'))
 })
 
+test('Kakao OAuth creates one member without email and preserves membership across sign-ins', async (t) => {
+  const body = { provider: 'kakao', callbackURL: origin + '/account', disableRedirect: true }
+  assert.equal((await api('/auth/sign-in/social', { body, sentOrigin: 'https://untrusted.invalid' })).status, 403)
+  assert.equal((await api('/auth/sign-in/social', { body: { ...body, scopes: ['account_email'] } })).status, 400)
+  assert.equal((await signup('4212345678@kakao.ons.invalid', 'Synthetic no collision password!')).status, 400)
+  const missingState = await api('/auth/callback/kakao?code=synthetic-auth-code')
+  assert.match(missingState.headers.get('Location'), /\/account\?error=state_not_found$/)
+
+  const begin = await api('/auth/sign-in/social', { body })
+  assert.equal(begin.status, 200, await begin.clone().text())
+  const redirect = new URL((await begin.json()).url)
+  assert.equal(redirect.origin, 'https://kauth.kakao.com')
+  assert.equal(redirect.searchParams.get('client_id'), fixtureKakaoClient)
+  assert.equal(redirect.searchParams.get('redirect_uri'), origin + '/api/v1/auth/callback/kakao')
+  assert.equal(redirect.searchParams.get('scope'), 'profile_nickname')
+  assert.equal(redirect.searchParams.get('code_challenge_method'), 'S256')
+  const state = redirect.searchParams.get('state')
+  assert.ok(state)
+
+  const vite = await createServer({ configFile: false, server: { middlewareMode: true, ws: false }, appType: 'custom' })
+  t.after(() => vite.close())
+  const { accountRoutes } = await vite.ssrLoadModule('/worker/routes/account.ts')
+  const fetchOriginal = globalThis.fetch
+  t.after(() => { globalThis.fetch = fetchOriginal })
+  let tokenRequest
+  let profile = { id: 4212345678, kakao_account: { profile: { nickname: '합성 카카오 회원' } } }
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : String(input))
+    if (url.href === 'https://kauth.kakao.com/oauth/token') {
+      tokenRequest = await new Request(input, init).formData()
+      return Response.json({ access_token: 'synthetic-kakao-token', token_type: 'bearer', expires_in: 3600 })
+    }
+    if (url.href === 'https://kapi.kakao.com/v2/user/me') return Response.json(profile)
+    return fetchOriginal(input, init)
+  }
+
+  async function finish(response, oauthState) {
+    const cookies = response.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ')
+    const url = new URL(`/api/v1/auth/callback/kakao?code=synthetic-auth-code&state=${oauthState}`, origin)
+    const callback = await accountRoutes(new Request(url, { headers: { Cookie: cookies, 'CF-Connecting-IP': '192.0.2.11' } }), env, url)
+    assert.equal(callback.status, 302)
+    return callback
+  }
+
+  const completed = await finish(begin, state)
+  assert.equal(completed.headers.get('Location'), origin + '/account')
+  assert.equal(createHash('sha256').update(tokenRequest.get('code_verifier')).digest('base64url'), redirect.searchParams.get('code_challenge'))
+  assert.equal(tokenRequest.get('client_id'), fixtureKakaoClient)
+  assert.ok(tokenRequest.has('client_secret'))
+  const cookie = cookieFrom(completed, 'session_token')
+  const signedIn = await api('/session', { cookie })
+  assert.equal(signedIn.status, 200)
+  const { user, admin } = await signedIn.json()
+  assert.deepEqual(user, { id: user.id, name: '합성 카카오 회원', email: null })
+  assert.equal(admin, null)
+  const stored = await env.DB.prepare('SELECT emailVerified FROM user WHERE id = ?').bind(user.id).first()
+  assert.equal(stored.emailVerified, 0)
+  assert.equal((await api('/study/questions/1', { cookie })).status, 200)
+  assert.equal((await api('/study/questions/25', { cookie })).status, 404)
+  const { code } = await issueFixtureTicket(user.id)
+  const redeemed = await api('/book-access/redeem', { cookie, body: { code } })
+  assert.equal(redeemed.status, 200)
+  assert.equal((await redeemed.json()).consumedNow, true)
+  assert.equal((await api('/study/questions/25', { cookie })).status, 200)
+  assert.equal((await api('/admin/purchases', { cookie })).status, 403)
+  const mailTable = await env.DB.prepare("SELECT 1 FROM sqlite_schema WHERE name = 'local_mail_fixtures'").first()
+  if (mailTable) assert.equal(await env.DB.prepare("SELECT 1 FROM local_mail_fixtures WHERE email = '4212345678@kakao.ons.invalid'").first(), null)
+
+  profile = { id: profile.id, kakao_account: { email: 'unrequested@example.test', is_email_valid: true, is_email_verified: true } }
+  const second = await api('/auth/sign-in/social', { body })
+  const nextState = new URL((await second.json()).url).searchParams.get('state')
+  const signedInAgain = await api('/session', { cookie: cookieFrom(await finish(second, nextState), 'session_token') })
+  const existing = await signedInAgain.json()
+  assert.deepEqual(existing.user, user)
+  assert.equal(existing.access.bookVerified, true)
+})
+
 test('the same account can retry redemption without a duplicate grant, and revocation is checked live', async () => {
   const password = 'Synthetic entitlement password 26!'
   const accounts = []
@@ -209,20 +308,7 @@ test('the same account can retry redemption without a duplicate grant, and revoc
     accounts.push({ user, cookie })
   }
   const [owner, other] = accounts
-  const campaign = 'ons-season-5'
-  const requestId = randomUUID()
-  const codeId = randomUUID()
-  const now = Date.now()
-  const code = randomBytes(16).toString('hex').toUpperCase()
-  const hash = createHash('sha256').update(code).digest('hex')
-  await env.DB.batch([
-    env.DB.prepare(`INSERT INTO purchase_requests (id, user_id, campaign_id, cafe_nickname, status, submitted_at, reviewed_at)
-      VALUES (?, ?, ?, '합성 닉네임', 'approved', ?, ?)`)
-      .bind(requestId, owner.user.id, campaign, now, now),
-    env.DB.prepare(`INSERT INTO access_codes (id, request_id, user_id, campaign_id, code_hash, issued_at, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .bind(codeId, requestId, owner.user.id, campaign, hash, now, now + 60_000),
-  ])
+  const { code, codeId } = await issueFixtureTicket(owner.user.id)
 
   const submit = (account) => api('/book-access/redeem', { body: { code }, cookie: account.cookie })
   const results = await Promise.all([submit(other), submit(owner), submit(owner)])

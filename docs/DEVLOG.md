@@ -1,5 +1,11 @@
 # 개발 기록
 
+## 2026-11-26 · 카카오 로그인
+
+- Worker의 `auth/config.ts`, `auth/kakao.ts`, `routes/account.ts`에 카카오 OAuth와 회원 접근을 연결했다. 카카오 회원번호로 계정을 식별하고 닉네임만 요청한다. 기존 이메일 로그인과 관리자 MFA를 유지한다. `AccountPage.tsx`에 카카오 공식 로그인 버튼을 추가했다. [카카오 로그인 버튼](https://developers.kakao.com/tool/resource/login)
+- 단위 22개, Worker 10개, 브라우저 17개 및 정적 자산 28개 검사를 통과했다. 합성 카카오 콜백, 동일 계정 재로그인, 학습 제한과 티켓 해금을 확인했다. 스테이징 `64545330`에서 새 번들과 Google 로그인 시작을 확인했다. 카카오 앱 키 등록과 실제 계정 콜백은 대기 중이다. 기존 Pages E2E는 로컬 포트 4173 충돌로 시작되지 않았고 교재 원본 검증은 로컬 Python 실행 파일과 교재 데이터가 없어 완료하지 못했다.
+- Cloudflare Email Sending 온보딩 화면에 선택 가능한 DNS 존이 없었으며 CLI에서도 `onstudy.kro.kr` 존을 찾지 못했다. Free는 사전 검증한 수신자만 발송할 수 있다. 신규 회원 발송은 등록 가능한 발신 도메인과 Workers Paid가 모두 필요하다. [Cloudflare 발신 도메인](https://developers.cloudflare.com/email-service/configuration/domains/) · [요금표](https://developers.cloudflare.com/email-service/platform/pricing/)
+
 ## 2026-11-26 · 3단계 카드 정렬과 로컬 가입
 
 - `cloudflare/web/stages.css`의 단계 설명에 두 줄 높이를 확보해 1·2·3단계 배지·제목·학습 상태를 맞췄다. 320·390·768·1080·1280px에서 상대 좌표를 대조했고 1080px 캡처는 `.ons2/qa/home-1080.png`다. 단위 22개, Worker 9개, Chromium·WebKit 15개와 정적 파일 28개 검사를 통과했다. 스테이징 버전은 `1233af1a`다.
@@ -191,10 +197,4 @@
 - HTTPS가 없는 주소에서 학습 시작, 오답 기록, 새로고침 후 진도, 모의고사 답안과 자동 백업을 확인하는 브라우저 회귀 테스트를 추가했다.
 - 교재 원문 검증과 단위 테스트 11개를 통과했다. 데스크톱·모바일 공개판 브라우저 테스트 8개에서 일반 HTTP 학습과 잠긴 단계 안내를 확인했다.
 
-## 2026-11-25 · Canary 0.0.2
-
-- GitHub Pages에서 `pch.oxstudy.kro.kr` 인증서 승인과 HTTPS 강제 설정을 확인했다. 배포 워크플로에 HTTP 요청이 HTTPS 운영 주소로 이동하는지 확인하는 단계를 추가했다.
-- 첫 방문 안내와 패치노트의 버전을 Canary 0.0.2로 맞췄다. 패치노트에 HTTP 주소의 HTTPS 자동 전환을 안내했다.
-- 교재 3,129문항 검증과 단위 테스트 11개, 전체판 브라우저 테스트 19개, 공개판 브라우저 테스트 8개를 통과했다. 운영 주소에서 HTTPS 전환과 서비스 워커 등록, 오프라인 이어 풀기를 확인했다.
-- iPhone 화면 크기의 WebKit에서 이전 HTML이 배포에서 사라진 시작 스크립트를 요청하면 흰 화면이 나오는 것을 재현했다. 이전 두 스크립트 주소에서 현재 앱과 스타일을 불러오게 하고, 시작에 실패하면 학습 경로를 유지하는 다시 불러오기 버튼을 표시한다.
-- 교재 검증과 단위 테스트 11개를 다시 통과했다. 전체판 브라우저 테스트 28개와 공개판 브라우저 테스트 17개에서 시작 화면 복구를 검증했다. 배포 검증에 iPhone 화면 크기의 WebKit 시작 테스트를 포함했다.
+2026-11-25 공개판의 HTTPS 전환과 iPhone의 PWA 시작 복구 기록은 [Canary 0.0.2](archive/2026-11-25-canary.md)에 보관했다.
