@@ -68,3 +68,22 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify the site serves HTTPS
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          if [[ "$PAGE_URL" != https://* ]]; then
+            echo '::error::GitHub Pages did not report an HTTPS URL.'
+            exit 1
+          fi
+
+          final_url=$(curl --fail --silent --show-error --location \
+            --proto-redir '=https' --max-redirs 5 \
+            --retry 5 --retry-all-errors --retry-max-time 60 --max-time 15 \
+            --output /dev/null --write-out '%{url_effective}' \
+            "http://${PAGE_URL#https://}")
+
+          if [[ "${final_url%/}" != "${PAGE_URL%/}" ]]; then
+            printf '::error::Expected HTTP to redirect to %s, got %s\n' "$PAGE_URL" "$final_url"
+            exit 1
+          fi

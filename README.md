@@ -2,6 +2,8 @@
 
 박철한 경찰헌법 OX 교재의 3,129문항을 세 단계와 교재 목차에 맞춰 학습하는 설치형 웹앱입니다. 모의고사는 교재 지문을 그대로 사용하며, 학습 기록은 브라우저에 저장합니다.
 
+공개판은 [박철한 온스](https://pch.oxstudy.kro.kr/)에서 이용할 수 있습니다.
+
 설정에서 터치 효과음과 진동을 각각 바꿀 수 있고, 재미 모드의 정답 소리는 세 종류 중에서 고를 수 있습니다. 자동 백업은 앱을 쓰는 동안 최근 기록을 기기에 저장합니다. 브라우저에서 폴더 선택을 지원하면 지정한 폴더에 JSON 파일을 저장할 수 있습니다.
 
 ## 로컬 실행
@@ -32,7 +34,9 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-GitHub 저장소의 **Settings → Pages → Build and deployment**에서 소스를 **GitHub Actions**로 설정하면 `main`의 검증된 빌드가 배포됩니다. 프로젝트 사이트 경로는 워크플로가 저장소 이름에서 생성합니다.
+GitHub 저장소의 **Settings → Pages**에서 배포 소스는 **GitHub Actions**, **Custom domain**은 `pch.oxstudy.kro.kr`로 설정하고 **Enforce HTTPS**를 켭니다. 워크플로는 Pages 설정에서 앱 경로를 받아 `main`의 검증된 빌드를 배포합니다. 배포 후 HTTP 주소가 유효한 인증서를 쓰는 HTTPS 주소로 이동하는지 검사합니다.
+
+학습 기록은 접속 주소와 프로토콜별로 저장합니다. 기존 HTTP 주소에서 내보낸 JSON 백업이 있다면 HTTPS 사이트의 설정에서 복원할 수 있습니다.
 
 구현과 검증 이력은 [개발 기록](docs/DEVLOG.md)에 있습니다.
 

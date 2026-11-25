@@ -4,7 +4,7 @@ import { book, questions, seeded } from './fixtures'
 
 test.skip(process.env.VITE_PUBLIC_PREVIEW !== '1', 'Run against the restricted public artifact.')
 
-test('study, mock exams, and device backup work before HTTPS is available', async ({ page, baseURL }) => {
+test('study, mock exams, and device backup work on a plain HTTP origin', async ({ page, baseURL }) => {
   const origin = 'http://ons.test'
   const app = new URL(baseURL!)
   await page.route(origin + '/**', async (route) => {

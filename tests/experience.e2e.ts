@@ -10,7 +10,9 @@ test('chapter study, source, pixel feedback, and offline review', async ({ page,
     }
   })
   await page.getByRole('button', { name: '패치노트' }).click()
-  await expect(page.getByRole('dialog')).toContainText('Canary 1.2.0')
+  const notes = page.getByRole('dialog', { name: '패치노트' })
+  await expect(notes).toContainText('Canary 0.0.2')
+  await expect(notes).toContainText('HTTP 주소로 접속해도 HTTPS로 자동 전환돼요.')
   await page.getByRole('button', { name: '닫기' }).click()
   await page.getByRole('link', { name: '학습 시작' }).click()
   await page.getByRole('button', { name: /제1장 헌법의 개념과 헌법학/ }).click()

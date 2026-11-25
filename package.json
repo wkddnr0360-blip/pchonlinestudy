@@ -1,6 +1,6 @@
 {
   "name": "police-constitution-ox",
-  "version": "1.2.0-canary.1",
+  "version": "0.0.2-canary",
   "private": true,
   "type": "module",
   "engines": {
