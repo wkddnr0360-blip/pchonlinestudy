@@ -217,6 +217,44 @@ test('Google OAuth begins with a new state and S256 challenge; wrong origins are
   assert.ok(redirect.searchParams.get('code_challenge'))
 })
 
+test('username registration is atomic and only its owner can withdraw with a recent session', async () => {
+  const body = { username: 'First.Learner', name: '합성 아이디 회원', password: 'Synthetic username password 26!' }
+  const register = (input, sentOrigin = origin) => api('/auth/sign-up/username', { body: input, sentOrigin })
+  const login = (input) => api('/auth/sign-in/username', { body: input })
+  assert.equal((await register(body, 'https://other.example.test')).status, 403)
+  assert.equal((await register({ ...body, username: 'bad@address' })).status, 400)
+  const registrations = await Promise.all([register(body), register({ ...body, username: 'first.learner' })])
+  assert.deepEqual(registrations.map((response) => response.status).sort(), [201, 409])
+  assert.equal((await signup('first.learner@id.ons.invalid', body.password)).status, 400)
+  assert.equal((await login({ ...body, password: 'Incorrect example password' })).status, 401)
+  const loggedIn = await login({ ...body, username: ' FIRST.LEARNER ' })
+  assert.equal(loggedIn.status, 200, await loggedIn.clone().text())
+  assert.deepEqual(await loggedIn.json(), { ok: true })
+  const cookie = cookieFrom(loggedIn, 'session_token')
+  const { user, admin } = await (await api('/session', { cookie })).json()
+  assert.deepEqual(user, { id: user.id, name: body.name, username: 'first.learner', email: null })
+  assert.equal(admin, null)
+  assert.equal((await api('/study/questions/1', { cookie })).status, 200)
+  assert.equal((await api('/admin/purchases', { cookie })).status, 403)
+
+  const { code } = await issueFixtureTicket(user.id)
+  assert.equal((await api('/book-access/redeem', { cookie, body: { code } })).status, 200)
+  const withdraw = (confirm, sentOrigin = origin) => api('/account/withdraw', { cookie, sentOrigin, body: { confirm } })
+  assert.equal((await withdraw('회원탈퇴', 'https://other.example.test')).status, 403)
+  assert.equal((await withdraw('탈퇴')).status, 400)
+  await env.DB.prepare('UPDATE session SET createdAt = ? WHERE userId = ?').bind(new Date(Date.now() - 11 * 60_000).toISOString(), user.id).run()
+  assert.equal((await withdraw('회원탈퇴')).status, 409)
+  await env.DB.prepare('UPDATE session SET createdAt = ? WHERE userId = ?').bind(new Date().toISOString(), user.id).run()
+  assert.equal((await withdraw('회원탈퇴')).status, 200)
+  assert.equal((await api('/session', { cookie })).status, 401)
+  const removed = await env.DB.prepare(`
+    SELECT (SELECT count(*) FROM user WHERE id = ?) + (SELECT count(*) FROM account WHERE userId = ?)
+      + (SELECT count(*) FROM entitlements WHERE user_id = ?) AS remaining
+  `).bind(user.id, user.id, user.id).first()
+  assert.equal(removed.remaining, 0)
+  assert.equal((await login(body)).status, 401)
+})
+
 test('Kakao OAuth creates one member without email and preserves membership across sign-ins', async (t) => {
   const body = { provider: 'kakao', callbackURL: origin + '/account', disableRedirect: true }
   assert.equal((await api('/auth/sign-in/social', { body, sentOrigin: 'https://untrusted.invalid' })).status, 403)
@@ -242,6 +280,7 @@ test('Kakao OAuth creates one member without email and preserves membership acro
   const fetchOriginal = globalThis.fetch
   t.after(() => { globalThis.fetch = fetchOriginal })
   let tokenRequest
+  let unlinked = false
   let profile = { id: 4212345678, kakao_account: { profile: { nickname: '합성 카카오 회원' } } }
   globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input))
@@ -250,6 +289,11 @@ test('Kakao OAuth creates one member without email and preserves membership acro
       return Response.json({ access_token: 'synthetic-kakao-token', token_type: 'bearer', expires_in: 3600 })
     }
     if (url.href === 'https://kapi.kakao.com/v2/user/me') return Response.json(profile)
+    if (url.href === 'https://kapi.kakao.com/v1/user/unlink') {
+      assert.equal(new Request(input, init).headers.get('Authorization'), 'Bearer synthetic-kakao-token')
+      unlinked = true
+      return Response.json({ id: profile.id })
+    }
     return fetchOriginal(input, init)
   }
 
@@ -292,6 +336,40 @@ test('Kakao OAuth creates one member without email and preserves membership acro
   const existing = await signedInAgain.json()
   assert.deepEqual(existing.user, user)
   assert.equal(existing.access.bookVerified, true)
+
+  const withdrawUrl = new URL('/api/v1/account/withdraw', origin)
+  const removed = await accountRoutes(new Request(withdrawUrl, {
+    method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ confirm: '회원탈퇴' }),
+  }), env, withdrawUrl)
+  assert.equal(removed.status, 200, await removed.clone().text())
+  assert.equal(unlinked, true)
+  assert.equal((await api('/session', { cookie })).status, 401)
+})
+
+test('a verified OAuth admin enrolls TOTP from a recently authenticated session', async () => {
+  const email = 'oauth-admin@example.test'
+  const password = 'Synthetic admin fixture password!'
+  assert.equal((await signup(email, password)).status, 200)
+  await verifyEmail(email)
+  const cookie = await signIn(email, password)
+  const { user } = await (await api('/session', { cookie })).json()
+  await env.DB.batch([
+    env.DB.prepare("UPDATE account SET password = NULL, providerId = 'google' WHERE userId = ?").bind(user.id),
+    env.DB.prepare("INSERT INTO member_roles(user_id, role) VALUES (?, 'admin')").bind(user.id),
+  ])
+  assert.equal((await api('/admin/purchases', { cookie })).status, 403)
+  await env.DB.prepare('UPDATE session SET createdAt = ? WHERE userId = ?').bind(new Date(Date.now() - 11 * 60_000).toISOString(), user.id).run()
+  assert.equal((await api('/auth/two-factor/enable', { cookie, body: {} })).status, 409)
+  await env.DB.prepare('UPDATE session SET createdAt = ? WHERE userId = ?').bind(new Date().toISOString(), user.id).run()
+  const enroll = await api('/auth/two-factor/enable', { cookie, body: {} })
+  assert.equal(enroll.status, 200, await enroll.clone().text())
+  const { totpURI } = await enroll.json()
+  const proof = await api('/auth/two-factor/verify-totp', { cookie, body: { code: totp(totpURI) } })
+  assert.deepEqual(await proof.json(), { ok: true, adminMfa: true })
+  const verifiedCookie = cookieFrom(proof, 'session_token')
+  assert.equal((await api('/admin/purchases', { cookie: verifiedCookie })).status, 200)
+  assert.equal((await api('/account/withdraw', { cookie: verifiedCookie, body: { confirm: '회원탈퇴' } })).status, 403)
 })
 
 test('the same account can retry redemption without a duplicate grant, and revocation is checked live', async () => {

@@ -42,7 +42,7 @@ export function PurchaseForm() {
   }
 
   const canSubmit = purchase === null || purchase?.status === 'resubmit' || purchase?.status === 'rejected'
-  return <section className="ons-purchase" aria-labelledby="ons-purchase-heading">
+  return <section className="ons-account-section ons-purchase" aria-labelledby="ons-purchase-heading">
     <h2 id="ons-purchase-heading"><Camera size={18} aria-hidden="true" />교재 구매 인증</h2>
     {error && <p className="ons-error" role="alert">{error}</p>}
     {purchase && <div className="ons-purchase-state" role="status">

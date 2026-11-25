@@ -1,10 +1,10 @@
 # 개발 기록
 
-## 2026-11-26 · 카카오 로그인
+## 2026-11-26 · 로그인·계정 정리와 문항 적재 확인
 
-- Worker의 `auth/config.ts`, `auth/kakao.ts`, `routes/account.ts`에 카카오 OAuth와 회원 접근을 연결했다. 카카오 회원번호로 계정을 식별하고 닉네임만 요청한다. 기존 이메일 로그인과 관리자 MFA를 유지한다. `AccountPage.tsx`에 카카오 공식 로그인 버튼을 추가했다. [카카오 로그인 버튼](https://developers.kakao.com/tool/resource/login)
-- 단위 22개, Worker 10개, 브라우저 17개 및 정적 자산 28개 검사를 통과했다. 합성 카카오 콜백, 동일 계정 재로그인, 학습 제한과 티켓 해금을 확인했다. 스테이징 `64545330`에서 새 번들과 Google 로그인 시작을 확인했다. 카카오 앱 키 등록과 실제 계정 콜백은 대기 중이다. 기존 Pages E2E는 로컬 포트 4173 충돌로 시작되지 않았고 교재 원본 검증은 로컬 Python 실행 파일과 교재 데이터가 없어 완료하지 못했다.
-- Cloudflare Email Sending 온보딩 화면에 선택 가능한 DNS 존이 없었으며 CLI에서도 `onstudy.kro.kr` 존을 찾지 못했다. Free는 사전 검증한 수신자만 발송할 수 있다. 신규 회원 발송은 등록 가능한 발신 도메인과 Workers Paid가 모두 필요하다. [Cloudflare 발신 도메인](https://developers.cloudflare.com/email-service/configuration/domains/) · [요금표](https://developers.cloudflare.com/email-service/platform/pricing/)
+- 스테이징에 Google·카카오·아이디 로그인과 회원탈퇴를 배포했다. 지정된 검증 Google 계정의 관리자 역할 1건을 확인했다. 첫 로그인 연결과 변경 파일·검증 결과는 별도 기록에 정리했다. [계정 연동과 검증](archive/2026-11-26-ons2-account-and-data.md)
+- 스테이징 D1은 실제 교재 0문항이다. 현재 GitHub 브랜치 네 곳은 이력 정리 이후 전체 교재 JSON을 제공하지 않는다. 비공개 정규화본을 확보하면 P0 적재 및 채점 대조를 먼저 진행한다. 분석 플래그는 0이다.
+- P3의 로컬 합성 회원 1,000명 검증에서 오류 0건, 채점 쓰기 6행 유지, 읽기 약 7→14행을 측정했다. 실제 부하 검증과 비용 기준은 [검증 환경](ONS2-STAGING.md#기본-ox-문항-분석)에 기록했다.
 
 ## 2026-11-26 · 3단계 카드 정렬과 로컬 가입
 

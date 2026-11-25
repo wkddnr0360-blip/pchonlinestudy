@@ -46,12 +46,15 @@ beforeEach(async () => {
 test('the mobile social login shows Kakao and Google and starts Kakao without email', async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
   try {
-    await page.route('**/api/v1/auth-methods', (route) => route.fulfill({ json: { kakao: true, google: true, email: false } }))
+    await page.route('**/api/v1/auth-methods', (route) => route.fulfill({ json: { kakao: true, google: true, email: false, username: true } }))
     await page.route('https://kauth.kakao.com/oauth/authorize?**', (route) => route.fulfill({ body: 'Synthetic Kakao sign-in' }))
     await page.goto(baseURL + '/account')
     const kakao = page.getByRole('button', { name: '카카오 로그인' })
     await expect(kakao).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Google로 로그인' })).toBeVisible()
+    const google = page.getByRole('button', { name: 'Google로 로그인' })
+    await expect(google).toBeVisible()
+    assert.ok((await google.boundingBox()).y < (await kakao.boundingBox()).y)
+    await expect(page.getByRole('button', { name: '아이디로 로그인' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: '이메일' })).toHaveCount(0)
     await kakao.locator('img').evaluate((image) => image.decode())
     await page.screenshot({ path: '.ons2/qa/kakao-sign-in-390.png', animations: 'disabled' })
@@ -61,6 +64,37 @@ test('the mobile social login shows Kakao and Google and starts Kakao without em
     const redirect = new URL(page.url())
     assert.equal(redirect.searchParams.get('redirect_uri'), baseURL + '/api/v1/auth/callback/kakao')
     assert.equal(redirect.searchParams.get('scope'), 'profile_nickname')
+  } finally {
+    await page.close()
+  }
+})
+
+test('mobile username signup, account sections and withdrawal work without email', async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  try {
+    await page.route('**/api/v1/auth-methods', (route) => route.fulfill({ json: { kakao: true, google: true, email: false, username: true } }))
+    await page.goto(baseURL + '/account')
+    await page.getByRole('button', { name: '아이디로 로그인' }).click()
+    await page.getByRole('button', { name: '아이디로 회원가입' }).click()
+    await page.locator('input[name="username"]').fill('ons-browser-member')
+    await page.locator('input[name="password"]').fill('A synthetic browser test password!')
+    await page.getByRole('button', { name: '아이디로 가입', exact: true }).click()
+    await expect(page.getByText('가입했습니다. 새 아이디로 로그인해 주세요.')).toBeVisible()
+    await page.locator('input[name="username"]').fill('ONS-BROWSER-MEMBER')
+    await page.locator('input[name="password"]').fill('A synthetic browser test password!')
+    await page.getByRole('button', { name: '아이디로 로그인', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '내 계정' })).toBeVisible()
+    await expect(page.getByRole('region', { name: '이용 상태' })).toBeVisible()
+    await expect(page.getByRole('region', { name: '교재 구매 인증' })).toBeVisible()
+    await expect(page.getByRole('form', { name: '교재 인증 티켓' })).toBeVisible()
+    await expect(page.getByRole('region', { name: '계정 관리' })).toBeVisible()
+    await page.screenshot({ path: '.ons2/qa/account-sections-390.png', fullPage: true, animations: 'disabled' })
+    await page.getByRole('button', { name: '회원탈퇴', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '회원탈퇴' })
+    await expect(dialog.getByRole('button', { name: '탈퇴 확정' })).toBeDisabled()
+    await dialog.getByRole('textbox').fill('회원탈퇴')
+    await dialog.getByRole('button', { name: '탈퇴 확정' }).click()
+    await expect(page.getByText('회원탈퇴를 완료했습니다.')).toBeVisible()
   } finally {
     await page.close()
   }

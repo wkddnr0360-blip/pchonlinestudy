@@ -206,6 +206,7 @@
 }
 
 .ons-kakao-button img { display: block; width: min(100%, 224px); height: auto; }
+.ons-username-button { border-color: var(--ons-rule); background: #f3f6fd; color: var(--ons-blue); }
 
 .ons-account-divider {
   display: flex;
@@ -245,7 +246,7 @@
 .ons-text-button:hover:not(:disabled) { text-decoration: underline; }
 .ons-account .ons-forgot { justify-self: end; margin-block: -0.35rem -0.58rem; }
 .ons-account .ons-text-muted { color: var(--ons-secondary); font-weight: 580; }
-.ons-return, .ons-sign-out { justify-self: start; }
+.ons-return { justify-self: start; }
 
 .ons-field-hint { margin: 0; color: var(--ons-secondary); font-size: 0.82rem; font-weight: 450; }
 
@@ -261,8 +262,12 @@
 .ons-account-links > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.15rem; }
 .ons-account-links > button { margin-top: -0.45rem; }
 .ons-identity-panel p { margin: 0; }
-.ons-identity { display: grid; padding: 0.9rem 1rem; border-radius: 0.75rem; background: #f3f6fd; overflow-wrap: anywhere; }
+.ons-account-section { padding: 0.95rem; border: 1px solid var(--ons-rule); border-radius: 0.85rem; }
+.ons-account-section h2 { display: flex; align-items: center; gap: 0.48rem; margin: 0 0 0.65rem; font-size: 1.06rem; }
+.ons-account-section h2 svg { color: #674ab4; }
+.ons-identity { display: grid; gap: 0.2rem; background: #f3f6fd; overflow-wrap: anywhere; }
 .ons-identity span { color: var(--ons-secondary); }
+.ons-identity .ons-member-label { margin-top: 0.45rem; }
 .ons-member-label { display: flex; align-items: center; gap: 0.45rem; }
 .ons-member-label svg { flex: none; color: #674ab4; }
 
@@ -286,14 +291,54 @@
 .ons-ticket-used { padding: 0.65rem; border: 1px solid #d7b459; border-radius: 0.8rem; background: #fff4cc; }
 .ons-ticket-used .ons-ticket-art { width: 9.5rem; max-width: 42%; }
 
-.ons-purchase { border-bottom: 1px solid #dfe3ee; padding-bottom: 1.05rem; }
-.ons-purchase h2 { display: flex; align-items: center; gap: 0.48rem; margin: 0 0 0.65rem; font-size: 1.08rem; }
-.ons-purchase h2 svg { color: #674ab4; }
+.ons-purchase form { gap: 0.8rem; }
 .ons-purchase input[type='file'] { border-style: dashed; background: #faf8ff; font-size: 0.875rem; }
 .ons-purchase input::file-selector-button { margin-inline-end: 0.48rem; border: 0; border-radius: 0.4rem; background: #eee8fb; color: #563ca3; padding: 0.2rem 0.5rem; font: inherit; cursor: pointer; }
 .ons-purchase-state { display: grid; gap: 0.3rem; padding: 0.7rem; border-radius: 0.65rem; background: #eef2fd; font-size: 0.9rem; }
 .ons-purchase-photo { display: block; width: 100%; max-height: 12rem; object-fit: contain; border-radius: 0.7rem; }
 .ons-admin-link { display: inline-flex; align-items: center; gap: 0.48rem; min-height: 2.75rem; color: var(--ons-blue); font-weight: 680; }
+
+.ons-account-action {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.55rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--ons-ink);
+  font: inherit;
+  font-weight: 640;
+  cursor: pointer;
+}
+.ons-account-management .ons-account-action { width: 100%; }
+.ons-account-action > svg:last-child { margin-inline-start: auto; }
+.ons-account-action:hover:not(:disabled) { background: #f3f6fd; }
+.ons-danger-text { color: #922d25; }
+
+.ons-withdraw-overlay { position: fixed; inset: 0; z-index: 100; background: #151b35a6; }
+.ons-withdraw-dialog {
+  position: fixed;
+  z-index: 101;
+  inset: 50% auto auto 50%;
+  width: min(26rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: var(--ons-surface);
+  color: var(--ons-ink);
+  box-shadow: 0 20px 60px #151b3560;
+}
+.ons-withdraw-dialog h2 { margin: 0 0 0.5rem; font-size: 1.2rem; }
+.ons-withdraw-dialog p { margin: 0 0 0.9rem; }
+.ons-withdraw-dialog form { display: grid; gap: 0.55rem; }
+.ons-withdraw-dialog input { width: 100%; box-sizing: border-box; min-height: 2.75rem; padding: 0.55rem; border: 1px solid #a5afc6; border-radius: 0.6rem; font: inherit; }
+.ons-withdraw-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; margin-top: 0.25rem; }
+.ons-danger-button { background: #9e322a; }
+.ons-danger-button:hover:not(:disabled) { background: #7f2822; }
 
 .ons-notice, .ons-error {
   margin: 0 0 1rem;

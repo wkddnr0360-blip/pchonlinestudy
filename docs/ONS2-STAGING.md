@@ -39,7 +39,11 @@ npm run dev:ons2
 
 1. 카카오디벨로퍼스에서 온스 개발용 앱을 선택하고 카카오 로그인을 사용 설정한다. REST API 키의 카카오 로그인 리다이렉트 URI에 `https://pch-ons2-staging.wkddnr0360.workers.dev/api/v1/auth/callback/kakao`를 등록한다. 닉네임(`profile_nickname`) 동의항목을 설정한다. [카카오 로그인 설정](https://developers.kakao.com/docs/ko/kakaologin/prerequisite)
 2. REST API 키와 클라이언트 시크릿을 스테이징 Worker의 `KAKAO_CLIENT_ID`와 `KAKAO_CLIENT_SECRET` 시크릿으로 각각 등록한다. `npx wrangler secret put <이름> --config cloudflare/wrangler.staging.jsonc`가 표시하는 프롬프트에 입력한다. 두 시크릿이 설정되면 `/api/v1/auth-methods`의 `kakao`가 `true`가 되고 계정 화면에 버튼이 나타난다. [Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
-3. 카카오 계정으로 첫 로그인과 로그아웃 뒤 재로그인, 1단계 학습과 같은 계정의 교재 티켓 등록을 확인한다. 카카오 계정의 이메일은 요청하지 않는다. `user.email`의 내부 `.invalid` 값은 Better Auth 호환용이고, 회원 인증은 `account`의 카카오 계정으로 확인한다. 화면이나 메일에 내부 주소를 사용하지 않는다. 연결된 카카오 앱을 교체하면 앱별 회원번호가 달라지므로 별도의 계정 이관이 필요하다. [카카오 회원번호](https://developers.kakao.com/docs/ko/kakaologin/common)
+3. 카카오 스테이징 앱에서 실제 회원 로그인을 확인했다. 동의항목의 `account_email`은 ‘권한 없음’이며 이메일을 요청하지 않는다. `user.email`의 내부 `.invalid` 값은 Better Auth 호환용이고, 회원 인증은 `account`의 카카오 계정으로 확인한다. 화면이나 메일에 내부 주소를 사용하지 않는다. 연결된 카카오 앱을 교체하면 앱별 회원번호가 달라지므로 별도의 계정 이관이 필요하다. [카카오 동의항목](https://developers.kakao.com/docs/ko/kakaologin/utilize) · [카카오 회원번호](https://developers.kakao.com/docs/ko/kakaologin/common)
+
+### 아이디 로그인과 계정 관리
+
+`/account`에서 Google, 카카오, 아이디 순서로 로그인한다. 아이디는 영문 소문자·숫자로 시작하며 마침표, 밑줄, 하이픈을 포함해 4~24자를 사용할 수 있다. 대문자는 소문자로 저장하고 비밀번호는 12자 이상을 받는다. 이메일이나 전화번호를 저장하지 않는 아이디 가입에는 이메일 재설정이 제공되지 않는다. 교재 이용 상태, 구매 인증 신청, 티켓 사용, 계정 관리가 각각 표시된다. 회원탈퇴에는 최근 로그인과 확인 문구가 필요하고, 카카오 계정의 경우 연결 해제 후 계정을 삭제한다.
 
 ### Cloudflare 이메일 발송 조건
 
@@ -63,7 +67,7 @@ npm run dev:ons2
 ## 스테이징 구매 인증 준비
 
 1. 별도 D1에 `0008_purchase_photos.sql`까지 적용한다. 스테이징에서는 합성 교재 사진과 테스트 계정을 사용한다. 기존 R2 구현이 배포된 환경에서는 `SELECT COUNT(photo_key) FROM purchase_requests`로 이관 대상을 확인한다. 0건이면 사진 이관 없이 전환한다. 사진 경로가 남은 환경에서는 비공개 원본을 정상적으로 이관할 수 있을 때 전환한다. 새 D1 사진을 받은 뒤의 롤백은 D1 사진 테이블을 읽는 빌드를 사용한다.
-2. 관리자용 이메일 계정으로 가입하고 이메일을 인증한다. 소유자가 D1에서 해당 계정 ID의 `member_roles`에 `admin` 역할을 추가한다. 회원 브라우저에는 권한 부여 경로가 없다. `/admin`에서 계정 비밀번호를 다시 입력하고 설정 키를 인증 앱에 직접 등록한다. 구매 목록과 사진 접근, 승인 및 티켓 발급·폐기에는 현재 관리자 역할과 15분 이내 인증 앱 코드 확인이 필요하다.
+2. 소유자가 이메일이 검증된 Google 또는 이메일 인증 계정의 ID를 확인하고, 스테이징 D1의 `member_roles`에 `admin` 역할을 추가한다. `/admin`에서 설정 키를 인증 앱에 등록한다. 등록 전 Google 계정은 10분 이내 로그인 세션이 필요하며, 비밀번호 계정은 비밀번호를 다시 입력한다. 구매 목록과 사진 접근, 승인 및 티켓 발급·폐기에는 현재 관리자 역할과 15분 이내 인증 앱 코드 확인이 필요하다.
 3. `PURCHASE_TICKET_TTL_HOURS`에 승인한 티켓 유효 시간을 설정한다. 로컬 테스트의 168시간은 운영 정책 제안값이다. 발급 직후 코드가 한 번 표시되며 관리자가 등록된 신청자에게 승인된 비공개 경로로 전달한다. 화면을 닫은 코드를 다시 조회할 수 없어 분실 시 재발급 절차를 사용한다.
 4. 브라우저에서 JPEG로 압축하고 512 KiB 이하로 제출한다. Worker는 JPEG 구조 검증과 메타데이터 제거 후 신청과 사진을 같은 D1 트랜잭션에 저장한다. 관리자 목록은 사진의 존재 여부만 읽으며 본문은 확인 버튼을 눌렀을 때 2단계 인증과 역할을 확인한 뒤 제공한다. 300장 기준 본문은 최대 150 MiB다. [D1 한도](https://developers.cloudflare.com/d1/platform/limits/)
 5. 앱 Worker에 매시간 Cron Trigger를 설정한다. 승인 7일이 지나면 사진 행을 파기하고 감사 이력을 남긴다. 심사 대기 사진은 심사를 위해 보관한다. 반려·재제출 사진은 `PURCHASE_PHOTO_RETENTION_DAYS`를 설정한 환경에서 처리 시각을 기준으로 정리하며 로컬은 30일이다. 구매 승인, 티켓, 회원 이용권은 보존한다. 무료 D1의 Time Travel 이력에는 삭제된 사진이 최대 7일 더 남을 수 있다. 복구 시에는 앱을 열기 전에 만료 사진 정리를 실행하고 조회를 확인한다. [Cloudflare Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/) · [D1 복구 이력](https://developers.cloudflare.com/d1/reference/time-travel/)
@@ -80,7 +84,7 @@ npm run db:ons2:local
 npx wrangler d1 execute DB --local --file .ons2/private/normalized-book.sql --config cloudflare/wrangler.local.jsonc
 ```
 
-부여된 권한으로 실제 전체 교재를 사용할 수 있는 환경에서 목차명, 문항 수, 기출 출처를 대조한 뒤 운영 적용을 검토한다. 2026-11-26 외부 스테이징 D1에 목차·모의고사 마이그레이션을 적용하고 미적용 마이그레이션이 없음을 확인했다. 실제 교재 적재와 앱 로그인 연동은 대기 중이다.
+부여된 권한으로 실제 전체 교재를 사용할 수 있는 환경에서 목차명, 문항 수, 기출 출처를 대조한 뒤 운영 적용을 검토한다. 외부 스테이징 D1에 목차·모의고사 마이그레이션을 적용했다. 스테이징의 교재는 0문항이고, 2026-11-26에 GitHub의 현재 브랜치 4개에서 기존 `public/book/manifest.json`이 제거된 것을 재확인했다. 권한이 확인된 비공개 정규화본이 적재에 필요하다.
 
 `/study`에서 허용된 단계와 번호 범위, 답 제출 후 해설 표시, 오답 재풀이를 확인한다. 계정 화면의 기존 OX 진도 가져오기 경로는 종료했다. D1에 이미 저장된 가져오기 기록은 기존 진도 응답에 포함한다.
 
@@ -90,6 +94,8 @@ npx wrangler d1 execute DB --local --file .ons2/private/normalized-book.sql --co
 
 1. 별도 환경에 `0009_study_statistics.sql`을 적용한다. `npm run verify:ons2:statistics-schema`가 Drizzle Kit의 산출물을 임시 디렉터리에 생성하고 실제 Wrangler 마이그레이션의 컬럼·기본값·키를 대조한다. Wrangler가 적용 이력의 기준이다.
 2. 분석을 활성화하기 전에 해당 계정의 Free 플랜을 확인한다. `ANALYTICS_ACCOUNT_ID`를 환경 변수로, **해당 계정만** 대상으로 한 `Account Analytics: Read` 토큰을 `ANALYTICS_METRICS_TOKEN` Worker 시크릿으로 넣는다. `ANALYTICS_ENABLED=1`과 매 5분 Cron `*/5 * * * *`을 설정하고 구매 사진의 매시간 Cron도 함께 등록한다. 대시보드 계정 지표가 연결되기 전에는 분석 플래그를 0으로 둔다. 로컬 테스트는 합성 지표를 사용한다. [Cloudflare Analytics 토큰](https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/)
-3. 기본 OX 응답을 여러 회원으로 제출해 `/admin?view=statistics`에서 체크포인트, 표본, 지연 상태를 확인한다. 초과한 작업은 한국 시간 오전 9시 일일 한도 리셋 이후 재개한다. 사용량 없이 집계가 진행되지 않는지와 채점은 반환되는지도 확인한다. `npm run bench:ons2:statistics`의 100개 병렬 작업은 로컬 D1 쿼리 측정이다.
+3. 기본 OX 응답을 여러 회원으로 제출해 `/admin?view=statistics`에서 체크포인트, 표본, 지연 상태를 확인한다. 초과한 작업은 한국 시간 오전 9시 일일 한도 리셋 이후 재개한다. 사용량 없이 집계가 진행되지 않는지와 채점은 반환되는지도 확인한다. `npm run bench:ons2:statistics -- 1000`은 100개씩 병렬로 실행하는 로컬 D1 쿼리 측정이며 실제 Worker 트래픽의 측정치와 구분한다.
 4. 오탈자와 의미를 유지한 교정은 새 리비전을 실제 출제판으로 전환하는 트랜잭션에서, 활성 리비전을 갱신하기 전에 `study_statistics_versions`에 새 리비전과 기존 통계 버전을 연결한다. 정답 또는 판단 기준이 바뀌면 새 리비전 자체가 통계 버전이 된다. 승인된 출제판 발행 흐름과 함께 적용한다.
 5. 사용량 이상이나 롤백 시 `ANALYTICS_ENABLED=0`으로 배포하고 분석 Cron을 제거한다. 통계 마이그레이션의 컬럼·데이터를 보존해 이후 해당 체크포인트부터 재개할 수 있다. Cloudflare 계정 한도와 결제 정책은 계정 소유자 승인 후 변경한다. [D1 요금과 한도](https://developers.cloudflare.com/d1/platform/pricing/) · [Workers 지출 한도](https://developers.cloudflare.com/workers/platform/spend-management/)
+
+합성 회원 1,000명 측정에서 기본 OX 채점의 쓰기는 풀이당 6행으로 유지됐고, 읽기는 약 7행에서 14행으로 늘었다. 300명이 하루 30문제씩 풀면 측정한 경로에서 약 12만 6천 행을 읽고 5만 4천 행을 쓴다. 통계 작업의 일일 예약분까지 더하면 약 37만 6천 읽기와 6만 4천 쓰기로, Free 계정 한도인 500만 읽기와 10만 쓰기 이내다. 1,000명이 각각 30문제를 푸는 날은 기본 OX 쓰기만 약 18만 행으로 Free 쓰기 한도를 넘는다. Paid의 월 $5 기본료가 적용될 경우 이 규모에서 측정한 월 540만 채점 쓰기는 포함량 5천만 행 안에 든다. 실제 사용량에는 로그인, 구매 사진, 결과 조회, 모의고사와 다른 Worker 사용량이 더해진다. Workers의 지출 한도는 계정의 요청과 CPU 요금에 적용되며 D1은 별도 사용량으로 추적한다. [D1 요금](https://developers.cloudflare.com/d1/platform/pricing/) · [Workers 요금](https://developers.cloudflare.com/workers/platform/pricing/) · [Workers 지출 한도](https://developers.cloudflare.com/workers/platform/spend-management/)

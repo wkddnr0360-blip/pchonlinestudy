@@ -2,14 +2,16 @@ const freshnessMs = 15 * 60 * 1000
 
 export async function getAdminAccess(db: D1Database, userId: string, sessionId: string, enabled: boolean) {
   const admin = await db.prepare(`
-    SELECT mfa.verified_at AS verifiedAt FROM member_roles role
+    SELECT mfa.verified_at AS verifiedAt, EXISTS (
+      SELECT 1 FROM account WHERE userId = role.user_id AND providerId = 'credential' AND password IS NOT NULL
+    ) AS passwordRequired FROM member_roles role
     LEFT JOIN admin_mfa mfa ON mfa.session_id = ?
     WHERE role.user_id = ? AND role.role = 'admin'
       AND NOT EXISTS (SELECT 1 FROM member_controls WHERE user_id = role.user_id AND suspended_at IS NOT NULL)
-  `).bind(sessionId, userId).first<{ verifiedAt: number | null }>()
+  `).bind(sessionId, userId).first<{ verifiedAt: number | null; passwordRequired: number }>()
   if (!admin) return null
   const mfaExpiresAt = enabled && admin.verifiedAt !== null ? admin.verifiedAt + freshnessMs : null
-  return { mfaEnabled: enabled, mfaFresh: mfaExpiresAt !== null && mfaExpiresAt > Date.now() }
+  return { mfaEnabled: enabled, mfaFresh: mfaExpiresAt !== null && mfaExpiresAt > Date.now(), passwordRequired: Boolean(admin.passwordRequired) }
 }
 
 export async function recordAdminMfa(db: D1Database, sessionToken: string) {

@@ -1,17 +1,19 @@
-import { ArrowLeft, ArrowRight, BadgeCheck, Eye, EyeOff, KeyRound, LockKeyhole, LogIn, LogOut, Mail, MailCheck, ShieldCheck, Ticket, UserRound, UserRoundPlus } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BadgeCheck, Eye, EyeOff, KeyRound, LockKeyhole, LogIn, Mail, MailCheck, ShieldCheck, Ticket, UserRound, UserRoundPlus } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AccountArtwork } from './AccountArtwork'
 import { TicketArt } from './TicketArt'
 import { PurchaseForm } from './PurchaseForm'
+import { AccountManagement } from './AccountManagement'
+import { UsernameForm } from './UsernameForm'
 import { studyReturnFromQuery } from '../study/navigation'
 import googleMark from './google-g.png'
 import kakaoButton from './kakao-login.png'
 import './account.css'
 
 type Mode = 'signin' | 'signup' | 'verify' | 'forgot' | 'reset'
-type Methods = { email: boolean; google: boolean; kakao: boolean; localMail?: boolean }
+type Methods = { email: boolean; google: boolean; kakao: boolean; username: boolean; localMail?: boolean }
 type Account = {
-  user: { id: string; email: string | null; name: string }
+  user: { id: string; email: string | null; name: string; username?: string }
   access: { bookVerified: boolean; expiresAt: number | null }
   admin?: { mfaEnabled: boolean; mfaFresh: boolean } | null
 }
@@ -59,6 +61,7 @@ export function AccountPage() {
   const accountCallback = location.origin + '/account' + (studyTarget ? '?study=' + encodeURIComponent(studyTarget.key) : '')
   const [resetToken] = useState(() => new URLSearchParams(location.search).get('token'))
   const [mode, setMode] = useState<Mode>(resetToken ? 'reset' : 'signin')
+  const [usernameForm, setUsernameForm] = useState<'signin' | 'signup' | null>(null)
   const [methods, setMethods] = useState<Methods | null>(null)
   const [account, setAccount] = useState<Account | null>(null)
   const [notice, setNotice] = useState('')
@@ -92,11 +95,17 @@ export function AccountPage() {
 
   function changeMode(next: Mode) {
     setMode(next)
+    setUsernameForm(null)
     setNotice('')
     setLocalMailLink(undefined)
     setError('')
     setPasswordVisible(false)
     requestAnimationFrame(() => heading.current?.focus())
+  }
+
+  function changeUsernameForm(next: 'signin' | 'signup') {
+    changeMode('signin')
+    setUsernameForm(next)
   }
 
   async function run(action: () => Promise<void>) {
@@ -175,6 +184,40 @@ export function AccountPage() {
     })
   }
 
+  function submitUsername(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const signup = usernameForm === 'signup'
+    void run(async () => {
+      const result = await post(signup ? '/auth/sign-up/username' : '/auth/sign-in/username', {
+        username: form.get('username'), password: form.get('password'), name: form.get('name'),
+      })
+      if (result.status === 429) return setError('요청이 많습니다. 잠시 기다렸다 다시 시도해 주세요.')
+      if (result.status === 409) return setError('이미 사용 중인 아이디입니다.')
+      if (!result.ok) return setError(signup ? '아이디와 비밀번호 길이를 확인해 주세요.' : '아이디와 비밀번호를 확인해 주세요.')
+      if (signup) {
+        changeUsernameForm('signin')
+        setNotice('가입했습니다. 새 아이디로 로그인해 주세요.')
+        return
+      }
+      const signedIn = await getAccount()
+      if (!signedIn) throw new Error('Session missing')
+      setAccount(signedIn)
+      changeMode('signin')
+    })
+  }
+
+  async function withdrawAccount(confirm: string) {
+    const result = await post('/account/withdraw', { confirm })
+    if (result.status === 409 || result.status === 401) return '로그아웃 후 다시 로그인하고 탈퇴를 요청해 주세요.'
+    if (result.status === 403) return '관리자 계정은 관리자 역할을 해제한 뒤 탈퇴할 수 있습니다.'
+    if (!result.ok) return '회원탈퇴를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    setAccount(null)
+    setTicketConsumed(false)
+    changeMode('signin')
+    setNotice('회원탈퇴를 완료했습니다.')
+  }
+
   function socialSignIn(provider: keyof typeof socialOrigins) {
     void run(async () => {
       const result = await post('/auth/sign-in/social', {
@@ -188,19 +231,21 @@ export function AccountPage() {
   }
 
   const showAccount = account && mode !== 'reset'
-  const showGoogle = methods?.google && mode === 'signin'
-  const showKakao = methods?.kakao && mode === 'signin'
+  const showGoogle = methods?.google && mode === 'signin' && !usernameForm
+  const showKakao = methods?.kakao && mode === 'signin' && !usernameForm
+  const showUsername = methods?.username && mode === 'signin' && !usernameForm
   const compact = !showAccount && showKakao && methods?.email
   const passwordField = mode === 'signin' || mode === 'signup' || mode === 'reset'
   const teacherStage = showAccount && account.access.bookVerified ? 3 : !showAccount && mode === 'signin' ? 1 : 2
-  const HeadingIcon = showAccount ? UserRound : headingIcons[mode]
+  const HeadingIcon = showAccount ? UserRound : headingIcons[usernameForm ?? mode]
+  const accountHeading = showAccount ? '내 계정' : usernameForm ? (usernameForm === 'signup' ? '아이디로 회원가입' : '아이디로 로그인') : headings[mode]
   return (
     <main className={compact ? 'ons-account ons-account-compact' : 'ons-account'}>
       <AccountArtwork stage={teacherStage} />
       <section className="ons-account-content" aria-labelledby="ons-account-heading">
         <div className="ons-account-form">
           <h1 id="ons-account-heading" tabIndex={-1} ref={heading}>
-            <span className="ons-account-heading-icon"><HeadingIcon size={23} aria-hidden="true" /></span>{showAccount ? '내 계정' : headings[mode]}
+            <span className="ons-account-heading-icon"><HeadingIcon size={23} aria-hidden="true" /></span>{accountHeading}
           </h1>
           {!showAccount && instructions[mode] && <p className="ons-account-hint">{methods?.localMail
             ? <>로컬 테스트 계정은 <code>@example.test</code> 이메일을 사용해 주세요.</> : instructions[mode]}</p>}
@@ -209,18 +254,24 @@ export function AccountPage() {
           {error && <div className="ons-error" role="alert">{error}</div>}
           {showAccount ? (
             <div className="ons-identity-panel" aria-busy={busy}>
-              <p className="ons-identity"><strong>{account.user.name}</strong><span>{account.user.email ?? '카카오 계정'}</span></p>
-              <p className="ons-member-label">{account.access.bookVerified ? <BadgeCheck size={17} aria-hidden="true" /> : <UserRound size={17} aria-hidden="true" />}
-                {account.access.bookVerified && account.access.expiresAt !== null
-                ? `교재 인증 이용권 · ${expiryDate.format(account.access.expiresAt - 1)}까지`
-                : '무료 회원'}</p>
+              <section className="ons-account-section ons-identity" aria-labelledby="ons-membership-heading">
+                <h2 id="ons-membership-heading"><UserRound size={18} aria-hidden="true" />이용 상태</h2>
+                <strong>{account.user.name}</strong>
+                {account.user.username
+                  ? account.user.username !== account.user.name && <span>{account.user.username}</span>
+                  : <span>{account.user.email ?? '카카오 로그인으로 가입'}</span>}
+                <p className="ons-member-label">{account.access.bookVerified ? <BadgeCheck size={17} aria-hidden="true" /> : <UserRound size={17} aria-hidden="true" />}
+                  {account.access.bookVerified && account.access.expiresAt !== null
+                    ? `교재 인증 이용권 · ${expiryDate.format(account.access.expiresAt - 1)}까지`
+                    : '무료 회원 · 교재 인증 전'}</p>
+              </section>
               {ticketConsumed && <div className="ons-ticket ons-ticket-used" role="status">
                 <TicketArt animate />
                 <div><strong>황금 티켓 사용 완료</strong><span>정회원 이용권이 열렸어요.</span></div>
               </div>}
               {!account.access.bookVerified && <PurchaseForm />}
               {!account.access.bookVerified && (
-                <form onSubmit={submitCode} className="ons-ticket-form">
+                <form onSubmit={submitCode} className="ons-account-section ons-ticket-form" aria-label="교재 인증 티켓">
                   <div className="ons-ticket">
                     <TicketArt />
                     <div><strong>교재 인증 티켓</strong><span>내 계정에 발급된 티켓을 등록하세요.</span></div>
@@ -232,28 +283,29 @@ export function AccountPage() {
               {studyTarget && (account.access.bookVerified || ['1', 'review'].includes(studyTarget.key)) &&
                 <a href={studyTarget.href} className="ons-account-continue">학습으로 돌아가기<ArrowRight size={17} aria-hidden="true" /></a>}
               {account.admin && <a href="/admin" className="ons-admin-link"><ShieldCheck size={17} aria-hidden="true" />관리자 페이지</a>}
-              <button type="button" className="ons-text-button ons-sign-out" disabled={busy} onClick={() => void run(async () => {
+              <AccountManagement busy={busy} onWithdraw={withdrawAccount} onSignOut={() => void run(async () => {
                 if (!(await post('/auth/sign-out', {})).ok) throw new Error('Sign-out failed')
                 setAccount(null)
                 setTicketConsumed(false)
                 changeMode('signin')
                 setNotice('로그아웃했습니다.')
-              })}><LogOut aria-hidden="true" size={16} />로그아웃</button>
+              })} />
             </div>
           ) : methods ? (
             <div className="ons-account-methods" aria-busy={busy}>
-              {showKakao && (
-                <button type="button" className="ons-kakao-button" disabled={busy} onClick={() => socialSignIn('kakao')}>
-                  <img src={kakaoButton} width="224" height="46" alt="카카오 로그인" />
-                </button>
-              )}
               {showGoogle && (
                 <button type="button" className="ons-google-button" disabled={busy} onClick={() => socialSignIn('google')}>
                   <img src={googleMark} width="20" height="20" alt="" />Google로 로그인
                 </button>
               )}
+              {showKakao && (
+                <button type="button" className="ons-kakao-button" disabled={busy} onClick={() => socialSignIn('kakao')}>
+                  <img src={kakaoButton} width="224" height="46" alt="카카오 로그인" />
+                </button>
+              )}
+              {usernameForm && <UsernameForm mode={usernameForm} busy={busy} onSubmit={submitUsername} onChange={changeUsernameForm} onBack={() => changeMode('signin')} />}
               {(showKakao || showGoogle) && methods.email && <p className="ons-account-divider">또는 이메일로</p>}
-              {methods.email && <>
+              {methods.email && !usernameForm && <>
                 <form key={mode} onSubmit={submitAuth}>
                   {mode === 'signup' && <label>표시 이름<span className="ons-field-with-icon"><UserRound size={17} aria-hidden="true" /><input name="name" autoComplete="nickname" maxLength={60} required /></span></label>}
                   {mode !== 'reset' && <label>이메일<span className="ons-field-with-icon"><Mail size={17} aria-hidden="true" /><input name="email" type="email" autoComplete="email" maxLength={254} autoCapitalize="none" spellCheck={false} required /></span></label>}
@@ -292,7 +344,10 @@ export function AccountPage() {
                   </button>
                 )}
               </>}
-              {!methods.email && !methods.google && !methods.kakao && <p className="ons-account-hint">현재 환경에서는 로그인 설정을 준비하고 있습니다.</p>}
+              {showUsername && <button type="button" className={methods.email ? 'ons-text-button' : 'ons-google-button ons-username-button'} disabled={busy} onClick={() => changeUsernameForm('signin')}>
+                <UserRound size={18} aria-hidden="true" />아이디로 로그인
+              </button>}
+              {!methods.email && !methods.google && !methods.kakao && !methods.username && <p className="ons-account-hint">현재 환경에서는 로그인 설정을 준비하고 있습니다.</p>}
             </div>
           ) : !error ? <p className="ons-account-hint" role="status">계정 정보를 불러오는 중입니다.</p> : null}
         </div>

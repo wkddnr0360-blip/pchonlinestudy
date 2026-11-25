@@ -8,7 +8,7 @@ import './purchase-admin.css'
 
 const StudyStatisticsAdmin = lazy(() => import('./StudyStatisticsAdmin').then((module) => ({ default: module.StudyStatisticsAdmin })))
 
-type Session = { user?: { name: string }; admin: { mfaEnabled: boolean; mfaFresh: boolean } | null }
+type Session = { user?: { name: string }; admin: { mfaEnabled: boolean; mfaFresh: boolean; passwordRequired: boolean } | null }
 
 async function api(path: string, body?: object, signal?: AbortSignal) {
   return fetch('/api/v1' + path, body ? {
@@ -77,8 +77,9 @@ export function PurchaseAdminPage() {
     event.preventDefault()
     const password = new FormData(event.currentTarget).get('password')
     void run(async () => {
-      const response = await api('/auth/two-factor/enable', { password })
-      if (!response.ok) throw new Error('계정 비밀번호를 확인해 주세요.')
+      const response = await api('/auth/two-factor/enable', password === null ? {} : { password })
+      if (response.status === 409) throw new Error('다시 로그인한 뒤 인증 앱을 설정해 주세요.')
+      if (!response.ok) throw new Error(session?.admin?.passwordRequired ? '계정 비밀번호를 확인해 주세요.' : '인증 앱 설정을 시작하지 못했습니다.')
       const data = await response.json()
       const key = new URL(data.totpURI).searchParams.get('secret')
       if (!key) throw new Error('인증 앱 설정 키를 받지 못했습니다.')
@@ -140,7 +141,7 @@ export function PurchaseAdminPage() {
         {session === undefined && !error && <p role="status">관리자 상태를 확인하고 있습니다.</p>}
         {!ready && !canVerify && session?.admin && <form className="ons-admin-form ons-admin-gate" onSubmit={enableMfa}>
           <h2><KeyRound size={20} aria-hidden="true" />인증 앱 설정</h2>
-          <label>계정 비밀번호<input name="password" type="password" autoComplete="current-password" required /></label>
+          {session.admin.passwordRequired && <label>계정 비밀번호<input name="password" type="password" autoComplete="current-password" required /></label>}
           <button type="submit" className="ons-button" disabled={busy}>설정 키 받기</button>
         </form>}
         {!ready && canVerify && <form className="ons-admin-form ons-admin-gate" onSubmit={verifyMfa}>

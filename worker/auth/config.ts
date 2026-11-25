@@ -3,6 +3,8 @@ import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { twoFactor } from 'better-auth/plugins/two-factor'
 import type { AppEnv } from '../index'
 import { isKakaoAccountAddress, mapKakaoProfile } from './kakao'
+import { consumeAuthLimit } from './rate-limit'
+import { isUsernameAccountAddress, usernameSignIn, usernameSignUp } from './username'
 
 export const authPath = '/api/v1/auth'
 
@@ -36,7 +38,7 @@ export function authSettings(env: AppEnv) {
 type AuthSettings = NonNullable<ReturnType<typeof authSettings>>
 
 async function sendAccountEmail(env: AppEnv, settings: AuthSettings, kind: 'verify' | 'reset', email: string, url: string, onLocalMail?: (url: string) => void) {
-  if (!settings.email || isKakaoAccountAddress(email)) return
+  if (!settings.email || isKakaoAccountAddress(email) || isUsernameAccountAddress(email)) return
   if (settings.testMail) {
     if (!email.endsWith('@example.test')) throw new Error('Synthetic email address required')
     await env.DB.batch([
@@ -58,7 +60,7 @@ async function sendAccountEmail(env: AppEnv, settings: AuthSettings, kind: 'veri
   if (!response.ok) throw new Error('Could not send account email')
 }
 
-export function createAuth(env: AppEnv, settings: AuthSettings, onLocalMail?: (url: string) => void) {
+export function createAuth(env: AppEnv, settings: AuthSettings, options: { onLocalMail?: (url: string) => void; usernameLogin?: boolean } = {}) {
   return betterAuth({
     appName: '박철한 온스',
     database: env.DB,
@@ -72,7 +74,7 @@ export function createAuth(env: AppEnv, settings: AuthSettings, onLocalMail?: (u
     session: { expiresIn: 60 * 60 * 24 * 7, cookieCache: { enabled: false } },
     verification: { storeIdentifier: 'hashed' },
     account: { accountLinking: { enabled: false }, encryptOAuthTokens: true },
-    plugins: [twoFactor()],
+    plugins: [twoFactor({ allowPasswordless: true })],
     socialProviders: {
       ...(settings.google ? {
         google: {
@@ -89,8 +91,11 @@ export function createAuth(env: AppEnv, settings: AuthSettings, onLocalMail?: (u
     },
     hooks: {
       before: createAuthMiddleware(async (context) => {
-        if (context.path === '/sign-up/email' && typeof context.body?.email === 'string' && isKakaoAccountAddress(context.body.email)) {
-          throw new APIError('BAD_REQUEST', { message: 'Email address is reserved' })
+        const email = context.body?.email
+        if (typeof email === 'string' && (isKakaoAccountAddress(email) || isUsernameAccountAddress(email))) {
+          if (!(options.usernameLogin && context.path === '/sign-in/email' && isUsernameAccountAddress(email))) {
+            throw new APIError('BAD_REQUEST', { message: 'Email address is reserved' })
+          }
         }
         if (context.path === '/sign-in/social' && context.body?.provider === 'kakao' && context.body.scopes?.length) {
           throw new APIError('BAD_REQUEST', { message: 'Additional Kakao scopes are unavailable' })
@@ -98,41 +103,27 @@ export function createAuth(env: AppEnv, settings: AuthSettings, onLocalMail?: (u
       }),
     },
     emailAndPassword: {
-      enabled: settings.email,
+      enabled: settings.email || Boolean(options.usernameLogin),
       autoSignIn: false,
-      requireEmailVerification: true,
+      requireEmailVerification: !options.usernameLogin,
       minPasswordLength: 12,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async ({ user, url }) => sendAccountEmail(env, settings, 'reset', user.email, url, onLocalMail),
+      sendResetPassword: async ({ user, url }) => sendAccountEmail(env, settings, 'reset', user.email, url, options.onLocalMail),
     },
     emailVerification: {
       sendOnSignUp: true,
       sendOnSignIn: false,
       autoSignInAfterVerification: false,
       expiresIn: 60 * 30,
-      sendVerificationEmail: async ({ user, url }) => sendAccountEmail(env, settings, 'verify', user.email, url, onLocalMail),
+      sendVerificationEmail: async ({ user, url }) => sendAccountEmail(env, settings, 'verify', user.email, url, options.onLocalMail),
     },
     rateLimit: {
       enabled: true,
       window: 60,
       max: 30,
       customStorage: {
-        consume: async (key, rule) => {
-          const now = Date.now()
-          const hashed = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${env.BETTER_AUTH_SECRET}:${key}`))
-          const id = Array.from(new Uint8Array(hashed), (byte) => byte.toString(16).padStart(2, '0')).join('')
-          const row = await env.DB.prepare(`
-            INSERT INTO auth_rate_limits (key, count, expires_at) VALUES (?, 1, ?)
-            ON CONFLICT(key) DO UPDATE SET
-              count = CASE WHEN expires_at <= ? THEN 1 ELSE count + 1 END,
-              expires_at = CASE WHEN expires_at <= ? THEN excluded.expires_at ELSE expires_at END
-            RETURNING count, expires_at
-          `).bind(id, now + rule.window * 1000, now, now).first<{ count: number; expires_at: number }>()
-          if (!row) return { allowed: false, retryAfter: rule.window }
-          const allowed = row.count <= rule.max
-          return { allowed, retryAfter: allowed ? null : Math.ceil((row.expires_at - now) / 1000) }
-        },
+        consume: (key, rule) => consumeAuthLimit(env, key, rule),
       },
     },
   })
@@ -141,7 +132,8 @@ export function createAuth(env: AppEnv, settings: AuthSettings, onLocalMail?: (u
 export function authRoute(settings: AuthSettings, method: string, path: string) {
   const route = `${method} ${path.slice(authPath.length)}`
   return route === 'POST /sign-out'
-    || (settings.email && method === 'POST' && [enableMfaPath, verifyMfaPath].includes(path))
+    || (method === 'POST' && (path === authPath + usernameSignIn || path === authPath + usernameSignUp))
+    || (method === 'POST' && [enableMfaPath, verifyMfaPath].includes(path))
     || (settings.email && (emailRoutes.has(route) || /^GET \/reset-password\/[a-zA-Z0-9_-]{16,128}$/.test(route)))
     || ((settings.google || settings.kakao !== null) && route === 'POST /sign-in/social')
     || (settings.google && route === 'GET /callback/google')
