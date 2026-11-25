@@ -6,7 +6,10 @@ export type Tier = 'unranked' | 'bronze' | 'silver' | 'gold' | 'platinum' | 'dia
 
 export interface TowerRankInput {
   userId: string
+  /** At least one valid normal-mode submission in the current ranking season. */
   participated: boolean
+  /** Server-derived Gold seed from the previous season's valid peak tier. */
+  seededGold?: boolean
   distinctCorrect: number
   /** Null when there is no valid finalized ranked run. */
   bestFloor: number | null
@@ -29,13 +32,13 @@ export function calculateTowerRanks(inputs: readonly TowerRankInput[]) {
       || (x.achievedAt !== null && (!Number.isSafeInteger(x.achievedAt) || x.achievedAt < 0))
       || (x.bestFloor === null) !== (x.achievedAt === null)) throw new Error('Invalid rank input')
   }
-  const active = inputs.filter(x => x.eligible && x.participated)
+  const active = inputs.filter(x => x.eligible && (x.participated || x.seededGold === true))
   const population = active.length
   const diamondCap = Math.floor(population / 100)
   const upperCap = Math.floor(population / 10)
   const tiers = new Map<string, Tier>(inputs.map(x => [x.userId, 'unranked']))
   for (const x of active) {
-    tiers.set(x.userId, x.distinctCorrect >= initialTowerRules.goldCorrect ? 'gold'
+    tiers.set(x.userId, x.seededGold === true || x.distinctCorrect >= initialTowerRules.goldCorrect ? 'gold'
       : x.distinctCorrect >= initialTowerRules.silverCorrect ? 'silver' : 'bronze')
   }
   const candidates = active.filter(x => tiers.get(x.userId) === 'gold' && x.bestFloor !== null && x.achievedAt !== null)
@@ -57,4 +60,14 @@ export function calculateTowerRanks(inputs: readonly TowerRankInput[]) {
 /** 50:50 for every completed two-turn block; random order within each block. */
 export function rankedStagePair(random: () => number = Math.random): readonly [2 | 3, 2 | 3] {
   return random() < 0.5 ? [2, 3] : [3, 2]
+}
+
+/** Only a valid previous-season peak of Platinum/Diamond carries into the next season. */
+export function nextSeasonSeed(peak: Tier): 'gold' | 'unranked' {
+  return peak === 'platinum' || peak === 'diamond' ? 'gold' : 'unranked'
+}
+
+/** Proposed equal mix; normal mode never includes book stage 3. */
+export function normalStagePair(random: () => number = Math.random): readonly [1 | 2, 1 | 2] {
+  return random() < 0.5 ? [1, 2] : [2, 1]
 }

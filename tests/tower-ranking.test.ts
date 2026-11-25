@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { calculateTowerRanks, rankedStagePair, type TowerRankInput } from '../src/challenge/ranking-policy'
+import { calculateTowerRanks, rankedStagePair, normalStagePair, nextSeasonSeed, type TowerRankInput } from '../src/challenge/ranking-policy'
 
 function users(n: number): TowerRankInput[] {
   return Array.from({ length: n }, (_, i) => ({ userId: String(i).padStart(5, '0'), participated: true,
@@ -40,4 +40,25 @@ test('rejects duplicate users and malformed records', () => {
 test('stage mix is one stage 2 and one stage 3 in each pair', () => {
   expect(rankedStagePair(() => 0.1)).toEqual([2, 3])
   expect(rankedStagePair(() => 0.9)).toEqual([3, 2])
+})
+
+test('only platinum or diamond peaks seed gold in the immediately following season', () => {
+  for (const tier of ['unranked', 'bronze', 'silver', 'gold'] as const) {
+    expect(nextSeasonSeed(tier)).toBe('unranked')
+  }
+  expect(nextSeasonSeed('platinum')).toBe('gold')
+  expect(nextSeasonSeed('diamond')).toBe('gold')
+  expect(nextSeasonSeed(nextSeasonSeed('diamond'))).toBe('unranked')
+})
+test('gold seed grants gold without inventing any correct answers or ranked result', () => {
+  const row = { ...users(1)[0], participated: false, distinctCorrect: 0, bestFloor: null, achievedAt: null }
+  const result = calculateTowerRanks([{ ...row, seededGold: true }])
+  expect(result.population).toBe(1)
+  expect(result.tiers.get(row.userId)).toBe('gold')
+  expect(calculateTowerRanks([row]).tiers.get(row.userId)).toBe('unranked')
+  expect(calculateTowerRanks([row]).population).toBe(0)
+})
+test('normal mode only draws stage 1 and 2', () => {
+  expect(normalStagePair(() => 0.1)).toEqual([1, 2])
+  expect(normalStagePair(() => 0.9)).toEqual([2, 1])
 })
