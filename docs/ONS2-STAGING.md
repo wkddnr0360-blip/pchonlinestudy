@@ -28,7 +28,7 @@ npm run dev:ons2
 
 2026-11-26에 Wrangler 계정 연결 및 Codex의 공식 Cloudflare MCP OAuth를 확인했다. `pch-ons2-staging` D1과 `pch-ons2-mcp-staging` KV를 별도로 생성했다. 로컬의 두 스테이징 Wrangler 설정에는 리소스 ID를 넣었으며 Git에서 제외한다. 구매 인증은 앱 D1을 사용하고 공개 정적 파일은 Workers Static Assets가 제공한다. [Cloudflare Codex 설정](https://developers.cloudflare.com/agent-setup/prompt.md)
 
-앱의 첫 스테이징은 [온스 2.0 스테이징](https://pch-ons2-staging.wkddnr0360.workers.dev/)에 배포했다. 앱의 비공개 API는 세션을 요구하고 공개 화면은 검색 로봇 색인 대상에서 제외했다. 첫 배포 시 D1의 질문·회원·사진은 0건이었다. 스테이징 Worker의 세션 키와 Google OAuth 키가 설정되어 있다. Google Cloud `pchoxstudy` 프로젝트의 `ONS 2.0 Staging` 웹 클라이언트에 `https://pch-ons2-staging.wkddnr0360.workers.dev/api/v1/auth/callback/google`을 등록했다. 발신 메일은 Resend 계정 로그인과 발신 도메인 검증을 기다리고 있다.
+앱의 첫 스테이징은 [온스 2.0 스테이징](https://pch-ons2-staging.wkddnr0360.workers.dev/)에 배포했다. 앱의 비공개 API는 세션을 요구하고 공개 화면은 검색 로봇 색인 대상에서 제외했다. 첫 배포 시 D1의 질문·회원·사진은 0건이었다. 스테이징 Worker의 세션 키와 Google OAuth 키가 설정되어 있다. Google Cloud `pchoxstudy` 프로젝트의 `ONS 2.0 Staging` 웹 클라이언트에 `https://pch-ons2-staging.wkddnr0360.workers.dev/api/v1/auth/callback/google`을 등록했다. Resend가 `onstudy.kro.kr`을 무료 공개 도메인으로 거부해 이메일 회원가입과 재설정은 발신 설정 전까지 비활성화 상태다.
 
 1. 권리자의 교재 변환·서비스 제공 및 아트 사용 허락을 확인한다. 권한이 있는 비공개 개발 저장소와 합성 자료 전용 스테이징을 준비하고 운영 프로젝트와 분리한다.
 2. Cloudflare 계정에서 스테이징 D1 데이터베이스와 MCP 전용 KV를 만든다. 두 `cloudflare/wrangler.*staging.example.jsonc` 템플릿을 같은 디렉터리에 복사하고 파일명에서 `.example`을 뺀 뒤 스테이징 계정·리소스 값을 채운다. 템플릿의 `workers_dev` 및 `preview_urls`는 기본 비활성이다. 접근 제한을 설정한 별도 스테이징 호스트명을 사용한다. [Wrangler 설정](https://developers.cloudflare.com/workers/wrangler/configuration/)
