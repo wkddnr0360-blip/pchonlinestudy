@@ -7,7 +7,7 @@ npm run build:ons2
 npm run preview:ons2:design
 ```
 
-`http://127.0.0.1:8788`에서 홈, 로그인, 관리자, 황금 티켓 사용을 확인한다. 미리보기 서버는 루프백 주소에만 열리고 합성 데이터로 응답한다. 계정 연결과 외부 전송은 실제 Worker에서 별도로 테스트한다. 티켓 체험 화면에는 입력할 테스트 코드가 표시된다.
+`http://127.0.0.1:8788`에서 홈, 로그인, 관리자, 황금 티켓 사용을 확인한다. `http://127.0.0.1:8788/study`에서 합성 OX 문제를 풀고 해설과 오답을 확인할 수 있다. 미리보기 서버는 루프백 주소에만 열리고 합성 데이터로 응답한다. 계정 연결과 외부 전송은 실제 Worker에서 별도로 테스트한다. 티켓 체험 화면에는 입력할 테스트 코드가 표시된다.
 
 ## 로컬 검증
 
@@ -25,6 +25,8 @@ npm run dev:ons2
 기본 단위 테스트는 모의고사, 번호 범위, 오답 배치에 필요한 합성 자료를 생성한다. 실제 원본 비교가 필요하면 권한이 확인된 HWPX에서 `scripts/import_book.py`와 `scripts/verify_book.py`를 실행한다. 기존 Pages 테스트에서 그 로컬 자료를 읽으려면 `ONS_LEGACY_BOOK=1`을 사용한다. 그 로컬 Pages 빌드와 `dist`는 운영 배포나 CI 산출물로 사용하지 않는다.
 
 ## 계정 연결 준비
+
+2026-11-26에 Wrangler 계정 연결 및 Codex의 공식 Cloudflare MCP OAuth를 확인했다. `pch-ons2-staging` D1과 `pch-ons2-mcp-staging` KV를 별도로 생성했다. 로컬의 두 스테이징 Wrangler 설정에는 리소스 ID를 넣었으며 Git에서 제외한다. D1에 `0001_auth.sql`부터 `0005_study.sql`을 적용했다. 별도의 호스트, private R2, 앱 OAuth 및 발신 메일 연결이 필요하다. 대시보드에 R2 구독 추가가 표시된다. 계정 소유자가 구독을 승인하면 private 버킷 `pch-ons2-private-staging`을 설정한다. Worker 업로드 및 공개 URL 연결은 아직 진행하지 않았다. [Cloudflare R2 가입 절차](https://developers.cloudflare.com/r2/get-started/) · [Cloudflare Codex 설정](https://developers.cloudflare.com/agent-setup/prompt.md)
 
 1. 권리자의 교재 변환·서비스 제공 및 아트 사용 허락을 확인한다. 권한이 있는 비공개 개발 저장소와 합성 자료 전용 스테이징을 준비하고 운영 프로젝트와 분리한다.
 2. Cloudflare 계정에서 스테이징 D1 데이터베이스, private R2 버킷, MCP 전용 KV를 만든다. R2의 Public Development URL과 Custom Domain을 모두 비활성으로 유지한다. 두 `cloudflare/wrangler.*staging.example.jsonc` 템플릿을 같은 디렉터리에 복사하고 파일명에서 `.example`을 뺀 뒤 스테이징 계정·리소스 값을 채운다. 템플릿의 `workers_dev` 및 `preview_urls`는 기본 비활성이다. 접근 제한을 설정한 별도 스테이징 호스트명을 사용한다. [Wrangler 설정](https://developers.cloudflare.com/workers/wrangler/configuration/) · [R2 공개 설정](https://developers.cloudflare.com/r2/buckets/public-buckets/)
@@ -46,3 +48,9 @@ npm run dev:ons2
 2. 관리자용 이메일 계정으로 가입하고 이메일을 인증한다. 소유자가 D1에서 해당 계정 ID의 `member_roles`에 `admin` 역할을 추가한다. 회원 브라우저에는 권한 부여 경로가 없다. `/admin`에서 계정 비밀번호를 다시 입력하고 설정 키를 인증 앱에 직접 등록한다. 구매 목록과 사진 접근, 승인 및 티켓 발급·폐기에는 현재 관리자 역할과 15분 이내 인증 앱 코드 확인이 필요하다.
 3. `PURCHASE_TICKET_TTL_HOURS`에 승인한 티켓 유효 시간을 설정한다. 로컬 테스트의 168시간은 운영 정책 제안값이다. 발급 직후 코드가 한 번 표시되며 관리자가 등록된 신청자에게 승인된 비공개 경로로 전달한다. 화면을 닫은 코드를 다시 조회할 수 없어 분실 시 재발급 절차를 사용한다.
 4. `PURCHASE_PHOTO_RETENTION_DAYS`에 승인한 심사 완료 사진 보관 기간을 넣고 앱 Worker에 Cron Trigger를 설정한다. 로컬은 30일을 검증한다. 승인·반려·재제출 처리일을 기준으로 private R2 사진을 지우고 D1 사진 경로와 파기 이력을 정리한다. D1 장애로 연결 여부를 확정하지 못한 고아 업로드에 대해서는 별도 회수 절차를 스테이징에서 확인한다. [Cloudflare Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/)
+
+## 스테이징 학습 검증
+
+`0005_study.sql`은 교재 번호와 단계, 수정 버전 및 OX 풀이 사건을 저장한다. 이 마이그레이션에는 교재 데이터가 없다. 로컬 브라우저와 Worker 통합 테스트가 `tests/ons2-book-fixture.mjs`의 합성 문제를 임시 D1에 삽입한다. 교재 원문은 권한이 확인된 별도 입력과 이관 검증을 거친다.
+
+`/study`에서 허용된 단계와 번호 범위, 답 제출 후 해설 표시, 오답 재풀이를 확인한다. 기존 OX 기록은 동일 주소의 브라우저 또는 온스 JSON 백업에서 선택하고, 이메일이 표시된 수신 계정으로 이관을 확정한다. 서버는 문제 번호, 사용자 답, 시각, 중복 식별자를 수신한다. 기존 시험 내용과 저장된 채점값은 브라우저에서 이관 요청에 포함하지 않는다. 기존 시험 및 오답 해소 상태는 후속 이관 범위다.

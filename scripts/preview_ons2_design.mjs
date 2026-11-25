@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
 import { fingerprintedAsset } from '../shared/static-assets.ts'
+import { syntheticQuestion } from '../tests/ons2-book-fixture.mjs'
 
 const host = '127.0.0.1'
 const port = Number(process.argv[2] ?? 8788)
@@ -23,6 +24,29 @@ const examples = [
     redeemedAt: ticket === 'redeemed' ? now - 1_000 : null, revokedAt: null } : null,
 }))
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2' }
+const studyAttempts = new Map()
+const studyAccess = { bookVerified: false, expiresAt: null }
+const studyCatalog = Array.from({ length: 24 }, (_, index) => ({ no: index + 1, stage: 1 }))
+
+async function previewStudy(req, res, path) {
+  if (path === '/api/v1/study/catalog') return json(res, { questions: studyCatalog, access: studyAccess })
+  if (path === '/api/v1/study/progress') return json(res, { progress: {
+    attempted: studyAttempts.size, imported: 0, lastNo: [...studyAttempts.keys()].at(-1) ?? null,
+  } })
+  if (path === '/api/v1/study/review') return json(res, {
+    questions: studyCatalog.filter(({ no }) => studyAttempts.get(no) === false), next: null,
+  })
+  const read = /^\/api\/v1\/study\/questions\/([1-9][0-9]?)$/.exec(path)
+  const body = req.method === 'POST' && path === '/api/v1/study/answers' ? await readJson(req) : null
+  const no = read ? Number(read[1]) : body?.no
+  if (!Number.isInteger(no) || no < 1 || no > studyCatalog.length) return json(res, { error: 'not_found' }, 404)
+  const { id, stage, revision, prompt, source, answer, marker, explanation } = syntheticQuestion(no)
+  if (read) return json(res, { question: { id, no, stage, revision, prompt, source } })
+  if (body.revision !== revision || !['O', 'X'].includes(body.choice)) return json(res, { error: 'invalid_input' }, 400)
+  const correct = body.choice === answer
+  studyAttempts.set(no, correct)
+  return json(res, { result: { correct, answer, marker, explanation } })
+}
 
 function json(res, value, status = 200) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }).end(JSON.stringify(value))
@@ -43,13 +67,13 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, origin)
     const path = url.pathname
     const referrer = req.headers.referer ? new URL(req.headers.referer) : null
-    const cookieMode = req.headers.cookie?.match(/(?:^|;\s*)ons-design=(admin|ticket|login)(?:;|$)/)?.[1]
+    const cookieMode = req.headers.cookie?.match(/(?:^|;\s*)ons-design=(admin|ticket|study|login)(?:;|$)/)?.[1]
     const mode = referrer?.origin === origin
-      ? referrer.pathname === '/admin' ? 'admin' : referrer.searchParams.get('preview') === 'ticket' ? 'ticket' : 'login'
+      ? referrer.pathname === '/admin' ? 'admin' : referrer.pathname === '/study' ? 'study' : referrer.searchParams.get('preview') === 'ticket' ? 'ticket' : 'login'
       : cookieMode
-    if (['/', '/account', '/admin'].includes(path)) {
-      const next = path === '/admin' ? 'admin' : url.searchParams.get('preview') === 'ticket' ? 'ticket' : 'login'
-      const localBar = `<aside style="margin:0;padding:8px 14px;background:#f0e8ff;color:#4e3587;font:600 13px/1.5 system-ui;display:flex;flex-wrap:wrap;gap:8px 16px"><strong>로컬 디자인 미리보기 · 합성 데이터</strong><a href="/">홈</a><a href="/account">로그인</a><a href="/account?preview=ticket">황금 티켓</a><a href="/admin">관리자</a>${next === 'ticket' ? `<span>테스트 티켓 <code>${ticketCode}</code></span>` : ''}</aside>`
+    if (['/', '/account', '/admin', '/study'].includes(path)) {
+      const next = path === '/admin' ? 'admin' : path === '/study' ? 'study' : url.searchParams.get('preview') === 'ticket' ? 'ticket' : 'login'
+      const localBar = `<aside style="margin:0;padding:8px 14px;background:#f0e8ff;color:#4e3587;font:600 13px/1.5 system-ui;display:flex;flex-wrap:wrap;gap:8px 16px"><strong>로컬 디자인 미리보기 · 합성 데이터</strong><a href="/">홈</a><a href="/study">OX 학습</a><a href="/account">로그인</a><a href="/account?preview=ticket">황금 티켓</a><a href="/admin">관리자</a>${next === 'ticket' ? `<span>테스트 티켓 <code>${ticketCode}</code></span>` : ''}</aside>`
       const html = (await readFile(new URL('index.html', client), 'utf8')).replace('<body>', '<body>' + localBar)
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
         'Set-Cookie': `ons-design=${next}; Path=/; HttpOnly; SameSite=Strict` }).end(html)
@@ -62,10 +86,12 @@ const server = createServer(async (req, res) => {
     }
     if (path === '/api/v1/auth-methods') return json(res, { email: true, google: true })
     if (path === '/api/v1/session') {
+      if (mode === 'study') return json(res, { user: { id: 'design-study', name: '학습 체험 회원', email: 'preview@example.test' }, access: studyAccess })
       if (mode !== 'ticket' && mode !== 'admin') return json(res, { error: 'login_required' }, 401)
       const user = { name: mode === 'admin' ? '미리보기 관리자' : '티켓 체험 회원', email: 'preview@example.test' }
       return json(res, { user, access: { bookVerified: false, expiresAt: null }, admin: mode === 'admin' ? { mfaEnabled: true, mfaFresh: true } : null })
     }
+    if (mode === 'study' && path.startsWith('/api/v1/study/')) return await previewStudy(req, res, path)
     if (mode === 'ticket' && path === '/api/v1/purchase') return json(res, { purchase: examples[2] })
     if (mode === 'ticket' && path === '/api/v1/book-access/redeem' && req.method === 'POST') {
       const { code } = await readJson(req)

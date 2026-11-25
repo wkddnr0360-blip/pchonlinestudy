@@ -19,9 +19,9 @@ export function privateHeaders(response: Response) {
   return headers
 }
 
-export async function readSmallJson(request: Request): Promise<unknown> {
+export async function readSmallJson(request: Request, limit = 1024): Promise<unknown> {
   if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json') return null
-  const bytes = await readLimitedBody(request, 1024)
+  const bytes = await readLimitedBody(request, limit)
   if (!bytes) return null
   try {
     return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes))

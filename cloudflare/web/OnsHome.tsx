@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, Camera, CircleCheck, TicketCheck, UserRoundPlus } from 'lucide-react'
+import { ArrowDown, ArrowRight, BookOpen, Camera, CircleCheck, TicketCheck, UserRoundPlus } from 'lucide-react'
 import { AccountArtwork } from '../../src/features/auth/AccountArtwork'
 import './home.css'
 
@@ -15,7 +15,8 @@ export function OnsHome() {
         <h1 id="ons-home-heading">경찰헌법 OX 학습<span>박철한 온스</span></h1>
         <p>내 계정에서 교재 구매를 인증하고 정회원 이용권을 준비하세요.</p>
         <div className="ons-home-actions">
-          <a className="ons-button" href="/account">로그인 및 회원가입<ArrowRight size={18} aria-hidden="true" /></a>
+          <a className="ons-button" href="/study"><BookOpen size={18} aria-hidden="true" />OX 학습 시작</a>
+          <a className="ons-home-guide" href="/account">로그인 및 회원가입<ArrowRight size={16} aria-hidden="true" /></a>
           <a className="ons-home-guide" href="#book-access">교재 인증 안내<ArrowDown size={16} aria-hidden="true" /></a>
         </div>
       </div>

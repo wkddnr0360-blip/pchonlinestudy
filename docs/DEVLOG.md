@@ -1,5 +1,13 @@
 # 개발 기록
 
+## 2026-11-26 · P0-C OX 학습·진도와 Cloudflare 스테이징 기반
+
+- `migrations/0005_study.sql`, `shared/study.ts`, `worker/routes/study.ts`, `worker/services/study.ts` 및 계정 라우트에서 교재 번호, 불변 원문 리비전, 회원별 풀이를 연결했다. 매 요청에서 유효한 이용권을 확인한다. 제출 전에는 단일 문제의 지문과 출처를 보낸다. 정답과 해설은 제출 후 전달한다. 같은 풀이 요청의 중복 저장과 틀린 리비전 제출을 차단한다.
+- `src/features/study/`, `src/ui/QuestionContent.tsx`, `cloudflare/web/`, `scripts/preview_ons2_design.mjs`에서 번호·범위·랜덤 학습, 최근 문항, 오답노트와 명시적 이관을 열었다. 이관 자료는 사용자가 선택한 로컬 기록 또는 온스 백업에서 추린다. 이전 OX 사건은 수신 계정 및 허용 범위를 확인하고 중복을 건너뛴다. 시각과 답은 기록으로 보존하며 이전 채점값은 새 채점에 반영하지 않는다.
+- 단위 22개, Worker 8개와 Chromium·WebKit 11개를 통과했다. Worker 정적 빌드의 파일 13개를 검사했다. 브라우저 첫 실행에서 테스트의 부분 일치 선택자가 범위 그룹 이름도 잡아 정수 입력을 찾지 못했다. 역할과 정확한 이름으로 선택하도록 수정한 뒤 전체 통과했다. 화면 캡처는 `.ons2/qa/study-320.png`에 저장했다. 변경은 `feature/cloudflare-admin-mcp`에 기록한다.
+- 공식 Cloudflare 스킬 24개를 설치하고 Wrangler와 Codex MCP의 OAuth 연결을 각각 확인했다. 스테이징 전용 D1 및 KV를 생성하고 D1에 5개 마이그레이션을 적용했다. 생성한 로컬 Wrangler 설정은 Git에서 제외한다. 대시보드에 R2 구독 추가가 표시된다. R2와 접근 제한 호스트, 앱 Google OAuth 및 Resend 연결, Worker 외부 배포가 남아 있다. [Cloudflare 에이전트 설정](https://developers.cloudflare.com/agent-setup/prompt.md)
+- 남은 작업은 실제 교재 비공개 이관, 실전 모의고사 및 시험 기록 이관, 문제 검증·수정용 온스 MCP, 탑과 14일 시즌 랭킹이다. 롤백 시 학습 라우트와 UI의 커밋을 되돌리고 이미 생성된 스테이징 테이블과 풀이 이력은 보존한다.
+
 ## 2026-11-26 · 학습자·관리자 UI 개편과 12프레임 황금 티켓
 
 - `cloudflare/web/{OnsHome.tsx,home.css,main.tsx,shell.css}`, `src/features/auth/`에 공통 색·타이포그래피와 Lucide 아이콘을 적용했다. 홈에는 온스 캐릭터, 로그인과 교재 인증 경로를 배치했고 계정 화면에는 입력 종류·회원 상태·구매 사진·티켓의 역할이 보이는 아이콘을 배치했다. 기존 철한쌤 기초 이미지는 원본 그대로 사용한다.

@@ -4,6 +4,7 @@ import { authPath, authRoute, authSettings, createAuth, enableMfaPath, verifyMfa
 import { json, privateHeaders, readSmallJson } from '../http'
 import { readMemberAccess, redeemAccessCode } from '../services/book-access'
 import { adminPrefix, adminPurchaseRoute, memberPurchaseRoute, purchasePath } from './purchases'
+import { studyPrefix, studyRoute } from './study'
 
 const sessionPath = '/api/v1/session'
 const redeemPath = '/api/v1/book-access/redeem'
@@ -18,12 +19,13 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
   const libraryRoute = path.startsWith(authPath + '/')
   const adminRoute = path.startsWith(adminPrefix)
   const purchaseRoute = path === purchasePath
-  if (!libraryRoute && !adminRoute && !purchaseRoute && path !== sessionPath && path !== redeemPath) return undefined
+  const study = path.startsWith(studyPrefix)
+  if (!libraryRoute && !adminRoute && !purchaseRoute && !study && path !== sessionPath && path !== redeemPath) return undefined
 
   const readSession = path === sessionPath && ['GET', 'HEAD'].includes(method)
   const redeem = path === redeemPath && method === 'POST'
-  if (!libraryRoute && !adminRoute && !purchaseRoute && !readSession && !redeem) return json({ error: 'not_found' }, 404, method)
-  if (!settings) return json({ error: readSession ? 'login_required' : 'service_unavailable' }, readSession ? 401 : 503, method)
+  if (!libraryRoute && !adminRoute && !purchaseRoute && !study && !readSession && !redeem) return json({ error: 'not_found' }, 404, method)
+  if (!settings) return readSession || study ? json({ error: 'login_required' }, 401, method) : json({ error: 'service_unavailable' }, 503, method)
   if (url.origin !== settings.origin || (method === 'POST' && request.headers.get('Origin') !== settings.origin)) {
     return json({ error: 'forbidden_origin' }, 403, method)
   }
@@ -77,6 +79,7 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
     const suspended = await env.DB.prepare('SELECT 1 FROM member_controls WHERE user_id = ? AND suspended_at IS NOT NULL')
       .bind(id).first()
     if (suspended) return json({ error: 'account_suspended' }, 403, method)
+    if (study) return await studyRoute(request, env.DB, url, id)
 
     const admin = (readSession || adminRoute)
       ? await getAdminAccess(env.DB, id, session.session.id, Boolean(session.user.twoFactorEnabled))

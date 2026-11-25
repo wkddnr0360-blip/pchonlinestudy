@@ -5,6 +5,7 @@ import { createServer } from 'node:http'
 import { after, before, beforeEach, test } from 'node:test'
 import { chromium, devices, expect, webkit } from '@playwright/test'
 import { createTestHarness } from 'wrangler'
+import { seedSyntheticBook } from './ons2-book-fixture.mjs'
 
 const workerConfig = {
   configPath: './cloudflare/wrangler.local.jsonc',
@@ -25,6 +26,7 @@ before(async () => {
     APP_ORIGIN: baseURL, AUTH_EMAIL_MODE: 'fixtures', LEGACY_PAGES_CACHE_MIGRATION: '1',
   } }] })
   await harness.getWorker().applyD1Migrations('DB')
+  await seedSyntheticBook((await harness.getWorker().getEnv()).DB)
   browser = await chromium.launch()
   await mkdir('.ons2/qa', { recursive: true })
 })
@@ -37,6 +39,52 @@ after(async () => {
 beforeEach(async () => {
   const env = await harness.getWorker().getEnv()
   await env.DB.prepare('DELETE FROM auth_rate_limits').run()
+})
+
+test('a mobile learner solves one printed number and moves only allowlisted legacy fields', async () => {
+  const page = await browser.newPage({ viewport: { width: 320, height: 850 } })
+  try {
+    const email = 'study-browser@example.test'
+    const password = 'Synthetic study browser password!'
+    const headers = { Origin: baseURL }
+    const created = await page.request.post(baseURL + '/api/v1/auth/sign-up/email', {
+      headers, data: { email, password, name: '합성 학습 회원', callbackURL: baseURL + '/account' },
+    })
+    assert.equal(created.status(), 200)
+    const env = await harness.getWorker().getEnv()
+    const verification = await env.PRIVATE_FILES.get('test-mail/verify/' + email)
+    await harness.fetch(await verification.text(), { redirect: 'manual' })
+    const authenticated = await page.request.post(baseURL + '/api/v1/auth/sign-in/email', { headers, data: { email, password } })
+    assert.equal(authenticated.status(), 200)
+
+    await page.goto(baseURL + '/study')
+    await expect(page.getByRole('radio', { name: '2단계' })).toBeDisabled()
+    await page.getByRole('spinbutton', { name: '시작 번호', exact: true }).fill('2')
+    await page.getByRole('button', { name: '1문제', exact: true }).click()
+    await expect(page.getByLabel('끝 번호')).toHaveValue('2')
+    await page.getByRole('button', { name: '문제 열기' }).click()
+    const question = page.getByRole('heading', { name: '교재 2번' })
+    await expect(question).toBeFocused()
+    await expect(page.getByRole('region', { name: '정답 및 해설' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'X', exact: true }).click()
+    await expect(page.getByText('틀렸습니다. 내 답 X · 정답 O')).toBeVisible()
+    await page.getByRole('button', { name: '오답노트 열기' }).click()
+    await expect(page.getByRole('button', { name: '1단계 · 2번' })).toBeVisible()
+    await page.getByText('기존 OX 진도 가져오기', { exact: true }).click()
+    const at = Date.now() - 60_000
+    const attempts = [{ id: 'synthetic-session:1', no: 1, answer: 'X', at, correct: true }]
+    const backup = { format: 'police-constitution-ox', schemaVersion: 1, attempts, exams: [{ prompt: 'synthetic private prompt sentinel' }] }
+    await page.getByLabel('온스 백업 JSON 선택').setInputFiles({ name: 'fixture.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) })
+    await expect(page.getByText(email, { exact: true })).toBeVisible()
+    const request = page.waitForRequest((item) => item.url().endsWith('/api/v1/study/import'))
+    await page.getByRole('button', { name: '이 계정으로 가져오기' }).click()
+    const sent = (await request).postDataJSON()
+    assert.deepEqual(sent.attempts, [{ eventId: 'synthetic-session:1', no: 1, choice: 'X', at }])
+    assert.deepEqual(Object.keys(sent).sort(), ['accountId', 'attempts'])
+    await expect(page.getByText('기존 OX 기록 1개를 가져왔습니다.')).toBeVisible()
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await page.screenshot({ path: '.ons2/qa/study-320.png', fullPage: true, animations: 'disabled' })
+  } finally { await page.close() }
 })
 
 for (const width of [320, 390, 768, 1280]) {

@@ -3,6 +3,7 @@ import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { after, before, beforeEach, test } from 'node:test'
 import { encode } from 'jpeg-js'
 import { createTestHarness } from 'wrangler'
+import { seedSyntheticBook } from './ons2-book-fixture.mjs'
 
 const origin = 'http://127.0.0.1:8787'
 const fixtureClient = 'synthetic-ons2.apps.googleusercontent.com'
@@ -81,10 +82,60 @@ before(async () => {
   await harness.listen()
   await worker.applyD1Migrations('DB')
   env = await worker.getEnv()
+  await seedSyntheticBook(env.DB)
 })
 
 after(async () => { await harness.close() })
 beforeEach(async () => { await env.DB.prepare('DELETE FROM auth_rate_limits').run() })
+
+test('private OX projects one prompt, grades on D1 and imports progress only to the confirmed account', async () => {
+  assert.equal((await api('/study/questions/1')).status, 401)
+  const password = 'Synthetic study fixture 26!'
+  const email = 'study@example.test'
+  assert.equal((await signup(email, password)).status, 200)
+  await verifyEmail(email)
+  const cookie = await signIn(email, password)
+  const { user } = await (await api('/session', { cookie })).json()
+  const catalog = await (await api('/study/catalog', { cookie })).json()
+  assert.equal(catalog.questions.length, 24)
+  assert.ok(catalog.questions.every(({ stage }) => stage === 1))
+  assert.equal((await api('/study/questions/25', { cookie })).status, 404)
+
+  const response = await api('/study/questions/1', { cookie })
+  assert.equal(response.headers.get('Cache-Control'), 'private, no-store')
+  const { question } = await response.json()
+  assert.deepEqual(Object.keys(question).sort(), ['id', 'no', 'prompt', 'revision', 'source', 'stage'])
+  assert.equal(question.id, 'pch-ox-1')
+  const body = { no: question.no, revision: question.revision, eventId: randomUUID(), choice: 'O', correct: true }
+  assert.equal((await api('/study/answers', { cookie, body, sentOrigin: 'https://other.example.test' })).status, 403)
+  assert.equal((await api('/study/answers', { cookie, body: { ...body, revision: 99 } })).status, 409)
+  assert.equal((await api('/study/answers', { cookie, body: { ...body, no: 25 } })).status, 404)
+  const retries = await Promise.all([api('/study/answers', { cookie, body }), api('/study/answers', { cookie, body })])
+  for (const reply of retries) {
+    assert.equal(reply.status, 200, await reply.clone().text())
+    const { result } = await reply.json()
+    assert.equal(result.correct, false)
+    assert.equal(result.answer, 'X')
+    assert.equal(result.explanation[0].kind, 'text')
+  }
+  assert.equal((await api('/study/answers', { cookie, body: { ...body, choice: 'X' } })).status, 409)
+  assert.deepEqual(await (await api('/study/review', { cookie })).json(), { questions: [{ no: 1, stage: 1 }], next: null })
+
+  const at = Date.now() - 60_000
+  const attempts = [{ eventId: 'legacy-session:1', no: 2, choice: 'O', at }, { eventId: 'legacy-session:25', no: 25, choice: 'X', at }]
+  assert.equal((await api('/study/import', { cookie, body: { accountId: 'other-account', attempts } })).status, 409)
+  const importBody = { accountId: user.id, attempts }
+  assert.deepEqual(await (await api('/study/import', { cookie, body: importBody })).json(), { imported: 1, skipped: 1 })
+  assert.deepEqual(await (await api('/study/import', { cookie, body: importBody })).json(), { imported: 0, skipped: 2 })
+  assert.deepEqual(await (await api('/study/progress', { cookie })).json(), { progress: { attempted: 1, imported: 1, lastNo: 1 } })
+  const { count } = await env.DB.prepare('SELECT COUNT(*) AS count FROM study_attempts WHERE user_id = ?').bind(user.id).first()
+  assert.equal(count, 2)
+  const { is_correct } = await env.DB.prepare("SELECT is_correct FROM study_attempts WHERE user_id = ? AND kind = 'legacy'").bind(user.id).first()
+  assert.equal(is_correct, null)
+
+  await env.DB.prepare('INSERT INTO member_controls (user_id, suspended_at) VALUES (?, ?)').bind(user.id, Date.now()).run()
+  assert.equal((await api('/study/progress', { cookie })).status, 403)
+})
 
 test('verified email sessions, password resets and revocation stay server-side', async () => {
   const email = 'student@example.test'
@@ -174,8 +225,16 @@ test('the same account can retry redemption without a duplicate grant, and revoc
   assert.deepEqual((await (await api('/session', { cookie: owner.cookie })).json()).access, {
     bookVerified: true, expiresAt: Date.parse('2027-03-14T15:00:00Z'),
   })
+  assert.equal((await (await api('/study/catalog', { cookie: owner.cookie })).json()).questions.length, 120)
+  const { question: premium } = await (await api('/study/questions/120', { cookie: owner.cookie })).json()
+  assert.equal(premium.stage, 3)
+  assert.equal((await api('/study/questions/120', { cookie: other.cookie })).status, 404)
+  const premiumAnswer = { no: premium.no, revision: premium.revision, eventId: randomUUID(), choice: 'O' }
+  assert.equal((await api('/study/answers', { cookie: owner.cookie, body: premiumAnswer })).status, 200)
   await env.DB.prepare('UPDATE book_campaigns SET ends_at = ? WHERE id = ?').bind(Date.now(), campaign).run()
   assert.equal((await (await api('/session', { cookie: owner.cookie })).json()).access.bookVerified, false)
+  assert.equal((await api('/study/answers', { cookie: owner.cookie, body: premiumAnswer })).status, 404)
+  assert.equal((await (await api('/study/progress', { cookie: owner.cookie })).json()).progress.attempted, 0)
   await env.DB.prepare('UPDATE book_campaigns SET ends_at = ? WHERE id = ?').bind(Date.parse('2027-03-14T15:00:00Z'), campaign).run()
   await env.DB.prepare('UPDATE entitlements SET revoked_at = ? WHERE code_id = ?').bind(Date.now(), codeId).run()
   assert.equal((await submit(owner)).status, 409)

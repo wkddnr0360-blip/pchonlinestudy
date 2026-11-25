@@ -1,0 +1,53 @@
+.study-page {
+  display: grid;
+  gap: 1rem;
+  width: min(66rem, calc(100% - 2rem));
+  margin: clamp(1.5rem, 5vw, 4rem) auto 3rem;
+}
+.study-heading { display: flex; align-items: center; gap: 1rem; }
+.study-heading h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.125rem); line-height: 1.12; letter-spacing: -0.055em; }
+.study-heading p { margin: 0.35rem 0 0; color: var(--ons-secondary); }
+.study-icon { display: grid; flex: none; place-items: center; width: 3.4rem; height: 3.4rem; background: #ebe3ff; color: var(--ons-blue); border-radius: 1.1rem; }
+.study-grid { display: grid; gap: 1rem; grid-template-columns: 1.35fr 1fr; align-items: start; }
+.study-card { min-width: 0; padding: clamp(1rem, 3vw, 1.65rem); background: #fff; border: 1px solid #e2dced; border-radius: 1.35rem; }
+.study-card h2 { margin: 0 0 0.6rem; letter-spacing: -0.045em; }
+.study-card form { display: grid; justify-items: stretch; gap: 0.8rem; }
+.study-card fieldset { padding: 0; margin: 0; min-width: 0; border: 0; }
+.study-card legend { padding: 0; margin-bottom: 0.3rem; font-weight: 700; }
+.study-options, .study-history, .study-import-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.study-options label, .study-secondary {
+  display: inline-flex; min-height: 2.75rem; align-items: center; gap: 0.45rem; box-sizing: border-box;
+  border: 1px solid var(--ons-border); padding: 0.35rem 0.7rem; border-radius: 0.75rem;
+  background: #fff; color: var(--ons-ink); font-weight: 650;
+}
+.study-secondary, .study-options label { cursor: pointer; }
+.study-options input { margin: 0; accent-color: var(--ons-blue); }
+.study-options label:has(input:checked), .study-secondary:hover:not(:disabled) { background: #f0eaff; border-color: var(--ons-blue); }
+.study-options label:has(input:disabled), .study-card button:disabled { cursor: default; }
+.study-fields, .study-answers { display: grid; gap: 0.65rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.study-fields label { display: grid; gap: 0.25rem; font-weight: 700; }
+.study-fields input { width: 100%; box-sizing: border-box; min-height: 2.75rem; padding: 0.4rem 0.65rem; border: 1px solid var(--ons-border); border-radius: 0.7rem; }
+.study-quick button { font-size: 0.875rem; }
+.study-history { align-items: stretch; }
+.study-review { display: flex; flex-wrap: wrap; list-style: none; padding: 0; gap: 0.4rem; }
+.study-question { border-color: #cbb8f5; }
+.study-meta, .study-source { color: var(--ons-secondary); margin: 0.25rem 0; font-size: 0.9rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.study-prompt { margin: 0.65rem 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(1rem, 2vw, 1.18rem); }
+.study-answers, .study-question details, .study-question .ons-button { margin-top: 1rem; }
+.study-answers button { justify-content: center; min-height: 3.4rem; font-size: 1.1rem; }
+.study-result { color: #493095; font-weight: 750; }
+.study-error { margin: 0; padding: 0.7rem 1rem; background: #fff1ed; color: #853825; border-radius: 0.7rem; }
+.study-import summary, .study-question summary { min-height: 2.75rem; cursor: pointer; font-weight: 750; }
+.study-import summary svg { vertical-align: middle; margin-inline: 0.3rem 0.5rem; color: var(--ons-blue); }
+.study-file { position: relative; }
+.study-file:focus-within { outline: 3px solid var(--ons-blue); outline-offset: 3px; }
+.study-file input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.study-file:has(input:disabled) { opacity: 0.68; }
+.study-import p:empty { display: none; }
+.study-question .explanation { padding: 0.9rem; border-radius: 0.75rem; background: #f7f4fe; }
+.study-question .explanation-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-weight: 750; }
+.study-question .original { white-space: pre-wrap; overflow-wrap: anywhere; }
+.study-question .table-scroll { overflow-x: auto; }
+.study-question table { border-collapse: collapse; }
+.study-question td { border: 1px solid var(--ons-border); padding: 0.5rem; }
+@media (max-width: 43rem) { .study-grid { grid-template-columns: 1fr; } }

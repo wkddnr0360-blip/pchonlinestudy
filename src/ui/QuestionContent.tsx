@@ -4,7 +4,7 @@ export function QuestionSource({ question }: { question: Question }) {
   return <div className="source-line"><span>기출 출처</span><span className="original">{question.source}</span></div>
 }
 
-export function Explanation({ question }: { question: Question }) {
+export function Explanation({ question }: { question: Pick<Question, 'answer' | 'marker' | 'explanation'> }) {
   return <section className="explanation" aria-label="정답 및 해설">
     <div className="explanation-heading">
       <span>정답 및 해설</span>
