@@ -74,15 +74,16 @@ def verify_pair_layout(source, rows):
 
 if __name__ == '__main__':
     cli = argparse.ArgumentParser(description=__doc__)
+    cli.add_argument('--root', type=Path, default=ROOT, help='directory containing the normalized manifest and chapters')
     cli.add_argument('--source', type=Path)
     args = cli.parse_args()
-    rows = verify(ROOT)
+    rows = verify(args.root)
     if args.source:
         verify_pair_layout(args.source, rows)
         with TemporaryDirectory() as temporary:
             rebuilt = Path(temporary)
             extract(args.source, rebuilt)
-            shipped = {path.relative_to(ROOT): path.read_bytes() for path in ROOT.rglob('*.json')}
+            shipped = {path.relative_to(args.root): path.read_bytes() for path in args.root.rglob('*.json')}
             regenerated = {path.relative_to(rebuilt): path.read_bytes() for path in rebuilt.rglob('*.json')}
             assert regenerated == shipped, 'The generated data differs from the supplied HWPX.'
         print('The supplied HWPX re-extracts to byte-identical app data.')

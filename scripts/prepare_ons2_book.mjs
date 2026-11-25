@@ -22,6 +22,12 @@ const records = z.array(z.object({
   answer: z.enum(['O', 'X']), marker: z.enum(['[○]', '[×]', '[X]']), explanation: z.array(block),
 }))
 const bounds = [[1, 504], [505, 1859], [1860, 3129]]
+const bookTables = [
+  ['book_questions', 'no, stage, part, chapter, section, chapter_key'],
+  ['question_revisions', 'no, revision, prompt, source, answer, marker, explanation'],
+  ['book_outline', 'stage, part, chapter, section, label, printed_page'],
+]
+const staged = (table) => 'ons_import_' + table
 
 async function checkedRead(schema, path) {
   const parsed = schema.safeParse(JSON.parse(await readFile(path, 'utf8')))
@@ -35,7 +41,7 @@ function value(text) {
 }
 
 function outline(stage, part, chapter, section, entry) {
-  return `INSERT INTO book_outline (stage, part, chapter, section, label, printed_page) VALUES (${stage}, ${part}, ${chapter}, ${section}, ${value(entry.label)}, ${entry.page});`
+  return `INSERT INTO ${staged('book_outline')} VALUES (${stage}, ${part}, ${chapter}, ${section}, ${value(entry.label)}, ${entry.page});`
 }
 
 function ensure(condition) {
@@ -44,7 +50,8 @@ function ensure(condition) {
 
 async function prepare(manifestPath) {
   const index = await checkedRead(manifest, manifestPath)
-  const statements = ['PRAGMA defer_foreign_keys = ON;']
+  const statements = bookTables.map(([table, fields]) =>
+    `CREATE TABLE ${staged(table)} AS SELECT ${fields} FROM ${table} WHERE 0;`)
   const seen = new Set()
   const headings = new Set()
   const recordRoot = join(dirname(manifestPath), index.version)
@@ -69,8 +76,8 @@ async function prepare(manifestPath) {
           if (row.section !== null) sectionCounts.set(row.section, (sectionCounts.get(row.section) ?? 0) + 1)
           seen.add(row.no)
           statements.push(
-            `INSERT INTO book_questions (no, stage, part, chapter, section, chapter_key) VALUES (${row.no}, ${stage}, ${row.part}, ${row.chapter}, ${row.section ?? 'NULL'}, ${value(row.chapterKey)});`,
-            `INSERT INTO question_revisions (no, revision, prompt, source, answer, marker, explanation) VALUES (${row.no}, 1, ${value(row.prompt)}, ${value(row.source)}, ${value(row.answer)}, ${value(row.marker)}, ${value(JSON.stringify(row.explanation))});`,
+            `INSERT INTO ${staged('book_questions')} VALUES (${row.no}, ${stage}, ${row.part}, ${row.chapter}, ${row.section ?? 'NULL'}, ${value(row.chapterKey)});`,
+            `INSERT INTO ${staged('question_revisions')} VALUES (${row.no}, 1, ${value(row.prompt)}, ${value(row.source)}, ${value(row.answer)}, ${value(row.marker)}, ${value(JSON.stringify(row.explanation))});`,
           )
         }
         const sections = new Set()
@@ -84,6 +91,18 @@ async function prepare(manifestPath) {
     }
   }
   ensure(seen.size === index.count)
+  // The import may execute statements separately. Publish both sides of the
+  // deferred foreign key within the same trigger invocation.
+  statements.push(
+    'CREATE TABLE ons_import_publish (ready INTEGER NOT NULL);',
+    `CREATE TRIGGER ons_publish_book AFTER INSERT ON ons_import_publish BEGIN
+  SELECT RAISE(ABORT, 'Book tables must be empty') WHERE ${bookTables.map(([table]) => `EXISTS (SELECT 1 FROM ${table})`).join(' OR ')};
+  ${bookTables.map(([table, fields]) => `INSERT INTO ${table} (${fields}) SELECT ${fields} FROM ${staged(table)};`).join('\n  ')}
+END;`,
+    'INSERT INTO ons_import_publish VALUES (1);',
+    'DROP TABLE ons_import_publish;',
+    ...bookTables.map(([table]) => `DROP TABLE ${staged(table)};`),
+  )
   const output = fileURLToPath(new URL('../.ons2/private/normalized-book.sql', import.meta.url))
   await mkdir(dirname(output), { recursive: true })
   await writeFile(output, statements.join('\n') + '\n', { flag: 'wx' })

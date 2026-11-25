@@ -1,5 +1,5 @@
 import { ArrowRight, LockKeyhole, NotebookPen, TicketCheck } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Stage, Ox } from '../../book/types'
 import { stagePresentation } from '../../app/stages'
 import type { StudyCatalog, StudyProgress, StudyQuestion, StudyResult } from '../../../shared/study'
@@ -28,6 +28,7 @@ export function StudyPage() {
   const [recommended, setRecommended] = useState<number[]>()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const visitedTurns = useRef(new Map<number, StudyTurn>())
 
   useEffect(() => {
     const controller = new AbortController()
@@ -63,15 +64,24 @@ export function StudyPage() {
   }
 
   async function loadQuestion(numbers: number[], index: number, practice: boolean) {
-    const { question } = await studyRequest<{ question: StudyQuestion }>('/study/questions/' + numbers[index] + (practice ? '' : '?mode=basic'))
+    let next = visitedTurns.current.get(index)
+    if (!next) {
+      const { question } = await studyRequest<{ question: StudyQuestion }>('/study/questions/' + numbers[index] + (practice ? '' : '?mode=basic'))
+      next = { question, eventId: question.statisticsContext?.eventId ?? crypto.randomUUID(), practice }
+      visitedTurns.current.set(index, next)
+    }
     setSequence(numbers)
     setPosition(index)
-    setTurn({ question, eventId: question.statisticsContext?.eventId ?? crypto.randomUUID(), practice })
+    setTurn(next)
     setReading(true)
   }
 
-  function open(numbers: number[], index = 0) {
-    if (numbers.length) void run(() => loadQuestion(numbers, index, route.review))
+  function open(numbers: number[], index = 0, practice = route.review) {
+    if (!numbers.length || busy) return
+    void run(async () => {
+      visitedTurns.current.clear()
+      await loadQuestion(numbers, index, practice)
+    })
   }
 
   function loadRecommendations(mode: 'personal' | 'common') {
@@ -84,12 +94,16 @@ export function StudyPage() {
   function answer(choice: Ox) {
     if (!turn || busy) return
     const { eventId, question } = turn
-    setTurn({ ...turn, choice })
+    const submitted = { ...turn, choice }
+    visitedTurns.current.set(position, submitted)
+    setTurn(submitted)
     void run(async () => {
       const { result } = await studyRequest<{ result: StudyResult }>('/study/answers', {
         body: { eventId, no: question.no, revision: question.revision, choice, statisticsProof: question.statisticsContext?.proof },
       })
-      setTurn({ ...turn, choice, result })
+      const answered = { ...submitted, result }
+      visitedTurns.current.set(position, answered)
+      setTurn(answered)
       setProgress((old) => old && { ...old, lastNo: question.no })
     })
   }
@@ -121,7 +135,9 @@ export function StudyPage() {
   </main>
 
   if (turn && reading) return <StudyReader turn={turn} position={position} total={sequence.length} busy={busy} error={error}
-    onAnswer={answer} onBack={closeReader} onNext={() => void run(() => loadQuestion(sequence, position + 1, turn.practice ?? false))} />
+    backLabel={route.review ? '오답노트' : '교재 목차'} onAnswer={answer} onBack={closeReader}
+    onPrevious={() => void run(() => loadQuestion(sequence, position - 1, turn.practice ?? false))}
+    onNext={() => void run(() => loadQuestion(sequence, position + 1, turn.practice ?? false))} />
 
   if (route.review) return <main className="study-page study-review-page ons-container">
     <header><NotebookPen size={27} aria-hidden="true" /><h1>오답노트</h1></header>
@@ -143,7 +159,7 @@ export function StudyPage() {
   const unfinished = turn && !turn.result
   return <StudySetup stage={stage} catalog={catalog} busy={busy} error={error} resumeNo={unfinished ? turn.question.no : relevantRecent}
     onOpen={open} recommendations={recommended} onRecommend={loadRecommendations}
-    onPractice={(numbers) => void run(() => loadQuestion(numbers, 0, true))}
+    onPractice={(numbers) => open(numbers, 0, true)}
     onResume={() => {
       if (unfinished) setReading(true)
       else if (relevantRecent !== undefined) {

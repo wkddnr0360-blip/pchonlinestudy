@@ -83,12 +83,13 @@ npm run dev:ons2
 `0006_book_outline.sql`에 원본 편·장·절 이름과 쪽수를, `0007_mock_exam.sql`에 서버 시험과 답안을 저장한다. 실제 교재를 로컬 D1에 연결할 때 기존 정규화 디렉터리와 단계별 장 파일을 그대로 사용한다. 다음 명령은 기존 파일의 3,129개 식별자와 목차 집계를 검증한 뒤 Git에서 제외된 위치에 SQL을 만든다. 실제 자료를 적재할 DB는 비어 있는 별도 로컬 DB로 지정한다.
 
 ```sh
+python scripts/verify_book.py --root "/path/to/normalized-book" --source "/path/to/original.hwpx"
 node scripts/prepare_ons2_book.mjs "/path/to/normalized-book/manifest.json"
 npm run db:ons2:local
 npx wrangler d1 execute DB --local --file .ons2/private/normalized-book.sql --config cloudflare/wrangler.local.jsonc
 ```
 
-부여된 권한으로 실제 전체 교재를 사용할 수 있는 환경에서 목차명, 문항 수, 기출 출처를 대조한 뒤 운영 적용을 검토한다. 외부 스테이징 D1에 목차·모의고사 마이그레이션을 적용했다. 스테이징의 교재는 0문항이고, 2026-11-26에 GitHub의 현재 브랜치 4개에서 기존 `public/book/manifest.json`이 제거된 것을 재확인했다. 권한이 확인된 비공개 정규화본이 적재에 필요하다.
+제공된 HWPX와 정규화 ZIP이 일치한 교재 3,129문항을 2026-11-26 로컬과 외부 스테이징 D1에 적재했다. 실제 파일은 Git에서 제외하는 경로에 보관한다. 적재 SQL은 임시 테이블의 자료를 한 트리거에서 문항·리비전·목차로 복사해 외래 키가 충족된 상태로 확정하고, 적재 후 임시 테이블을 제거한다. 적재 대상에 기존 교재가 있으면 중단한다. [D1의 데이터 가져오기](https://developers.cloudflare.com/d1/best-practices/import-export-data/)
 
 `/study`에서 허용된 단계와 번호 범위, 답 제출 후 해설 표시, 오답 재풀이를 확인한다. 계정 화면의 기존 OX 진도 가져오기 경로는 종료했다. D1에 이미 저장된 가져오기 기록은 기존 진도 응답에 포함한다.
 
