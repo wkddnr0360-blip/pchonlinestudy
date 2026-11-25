@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, ListOrdered, Play, Shuffle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, ListOrdered, Play, Shuffle, Hash } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { stages, validStage } from '../app/stages'
 import { LockedPreview } from '../app/LockedPreview'
@@ -11,7 +11,7 @@ import { db } from '../storage/db'
 import { createRecordId } from '../storage/recordId'
 import { ErrorNotice, Modal } from '../ui/Controls'
 import { TeacherButton } from '../ui/TeacherButton'
-import { scopeKey, shuffle } from './selection'
+import { scopeKey, selectNumberRange, shuffle } from './selection'
 
 interface Selection {
   scope: Scope
@@ -23,15 +23,43 @@ function StartStudy({ book, selection, close }: { book: BookIndex; selection: Se
   const { scope, count, label } = selection
   const key = scopeKey(scope.stage, scope.part, scope.chapterKey, scope.section)
   const existing = useLiveQuery(() => db.studies.get(key), [key])
-  const [mode, setMode] = useState<'order' | 'random'>('order')
+  const [mode, setMode] = useState<'order' | 'random' | 'range'>('order')
   const [length, setLength] = useState(String(Math.min(10, count)))
+  const [rangeNumbers, setRangeNumbers] = useState<number[]>()
+  const [first, setFirst] = useState('')
+  const [last, setLast] = useState('')
+  const [rangeError, setRangeError] = useState('')
+  const [rangeRetry, setRangeRetry] = useState(0)
   const [waiting, setWaiting] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
+  useEffect(() => {
+    if (mode !== 'range') return
+    let live = true
+    setRangeError('')
+    getQuestions(book, scope).then((available) => {
+      if (!live) return
+      const numbers = available.map(({ no }) => no).sort((a, b) => a - b)
+      if (!numbers.length) throw new Error('No questions')
+      setRangeNumbers(numbers)
+      setFirst((value) => value || String(numbers[0]))
+      setLast((value) => value || String(numbers[Math.min(9, numbers.length - 1)]))
+    }).catch(() => {
+      if (live) setRangeError('교재 번호를 불러오지 못했습니다.')
+    })
+    return () => { live = false }
+  }, [book, scope, mode, rangeRetry])
+
+  let rangeCount = 0
+  if (rangeNumbers && first.trim() && last.trim()) {
+    try { rangeCount = selectNumberRange(rangeNumbers, Number(first), Number(last)).length }
+    catch { /* Invalid ranges remain unselectable. */ }
+  }
+
   async function start(event: FormEvent) {
     event.preventDefault()
-    if (waiting) return
+    if (waiting || (mode === 'range' && !rangeCount)) return
     const size = Number(length)
     if (mode === 'random' && (!Number.isInteger(size) || size < 1 || size > count)) return
     setWaiting(true)
@@ -39,9 +67,11 @@ function StartStudy({ book, selection, close }: { book: BookIndex; selection: Se
     try {
       const available = await getQuestions(book, scope)
       if (!available.length) throw new Error('학습할 문제가 없습니다.')
-      const numbers = (mode === 'random' ? shuffle(available).slice(0, size) : available).map((question) => question.no)
+      const numbers = mode === 'range'
+        ? selectNumberRange(available.map(({ no }) => no), Number(first), Number(last))
+        : (mode === 'random' ? shuffle(available).slice(0, size) : available).map((question) => question.no)
       await db.studies.put({
-        key, id: createRecordId(), version: book.version, scope, mode, numbers,
+        key, id: createRecordId(), version: book.version, scope, mode: mode === 'random' ? 'random' : 'order', numbers,
         position: 0, updatedAt: Date.now(),
       })
       navigate('/study/' + key)
@@ -61,14 +91,36 @@ function StartStudy({ book, selection, close }: { book: BookIndex; selection: Se
       <div className="mode-picker" role="group" aria-label="학습 방식">
         <button type="button" aria-pressed={mode === 'order'} onClick={() => setMode('order')}><ListOrdered /> 순서대로</button>
         <button type="button" aria-pressed={mode === 'random'} onClick={() => setMode('random')}><Shuffle /> 랜덤</button>
+        <button type="button" aria-pressed={mode === 'range'} onClick={() => setMode('range')}><Hash /> 번호 지정</button>
       </div>
       {mode === 'random' && <div className="field">
         <label htmlFor="sample-length">풀 문제 수</label>
         <input id="sample-length" type="number" min={1} max={count} required inputMode="numeric" value={length}
           onChange={(event) => setLength(event.target.value)} />
       </div>}
+      {mode === 'range' && (rangeError
+        ? <ErrorNotice message={rangeError} retry={() => setRangeRetry((value) => value + 1)} />
+        : !rangeNumbers ? <p role="status" className="dialog-description">교재 번호를 확인하고 있어요.</p>
+        : <div className="number-range">
+          <p className="dialog-description">현재 범위: 교재 {rangeNumbers[0].toLocaleString('ko-KR')}–{rangeNumbers[rangeNumbers.length - 1].toLocaleString('ko-KR')}번</p>
+          <div className="range-fields">
+            <div className="field">
+              <label htmlFor="first-number">시작 번호</label>
+              <input id="first-number" type="number" inputMode="numeric" min={rangeNumbers[0]} max={rangeNumbers[rangeNumbers.length - 1]} step={1} required value={first}
+                onChange={(event) => setFirst(event.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="last-number">끝 번호</label>
+              <input id="last-number" type="number" inputMode="numeric" min={rangeNumbers[0]} max={rangeNumbers[rangeNumbers.length - 1]} step={1} required value={last}
+                onChange={(event) => setLast(event.target.value)} />
+            </div>
+          </div>
+          <p className="dialog-description" aria-live="polite">{rangeCount
+            ? rangeCount.toLocaleString('ko-KR') + '문항 · 교재 번호순'
+            : '현재 목차에 포함되는 올바른 번호 범위를 입력해 주세요.'}</p>
+        </div>)}
       {error && <ErrorNotice message={error} />}
-      <button className="button primary full" disabled={waiting}>{waiting ? '문제 불러오는 중' : existing ? '새로 풀기' : '문제 풀기'} <ArrowRight size={18} /></button>
+      <button className="button primary full" disabled={waiting || (mode === 'range' && (!rangeCount || !!rangeError))}>{waiting ? '문제 불러오는 중' : existing ? '새로 풀기' : '문제 풀기'} <ArrowRight size={18} /></button>
     </form>
   </Modal>
 }
