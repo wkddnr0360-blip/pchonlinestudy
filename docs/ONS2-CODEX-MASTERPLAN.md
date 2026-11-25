@@ -55,10 +55,15 @@
 
 ## 5. 도트 게임 엔진 및 아트
 - Phaser(안정 major 고정, TypeScript/Vite 호환 검증) 선택: https://github.com/phaserjs/phaser ; Canvas/WebGL 렌더, tilemap, sprite atlas, camera, tween, particles. 화면 안 작은 lazy-loaded canvas만 사용, 로그인·문제·OX 버튼·해설은 React DOM. 게임 점수/권한은 엔진에서 계산하지 않는다. React가 서버 이벤트(correct,missed,rankChanged)만 renderer에 전달. canvas init once/destroy on unmount, resize, context loss, low-memory fallback, hidden tab pause rendering not timer. reduced-motion 정적 모드, 사운드 기본 off 또는 저장된 설정, 스킵 가능.
-- Pixelorama https://github.com/Orama-Interactive/Pixelorama 로 editable sprite sources + PNG atlas/JSON; Tiled https://github.com/mapeditor/tiled 로 16x16 tileset + map JSON. 공식/직접 제작 라이선스 기록, 제3자 캐릭터·음원 무단 복제 금지. 기존 teacher.webp 및 teacher-reactions.webp 특징 유지, 소유자/권리자 허가 확인. AI 초안 후 프레임 수작업 QA: 동일 실루엣/얼굴/안경 여부 등 실제 원본 기준, 동일 anchor/팔레트/정렬, 픽셀 정수 배율 nearest-neighbor, 축 늘림 금지. 48x64 또는 64x64 캐릭터, 16px tile, 320x192 또는 320x240 logical canvas, responsive letterbox/scale. 원본 소스·atlas·manifest·license/credits 유지. 새 리소스는 별도 lazy chunk/용량 예산.
-- 5개 시각 테마: Bronze 햇살 서재/가죽 가방·책, Silver 달빛 기록관/은빛 코트·깃펜, Gold 황금 법전의 전당/월계관·황금 책, Platinum 청록 별빛 성채/망토·빛나는 법전, Diamond 하늘의 재판정/결정 왕관·별빛 오라. 독자적 등급 emblem/색+아이콘+텍스트, 랭킹용 얼굴/배지/전신 캐릭터. 실제 선생님 원본을 확인한 뒤 승인.
+- Pixelorama https://github.com/Orama-Interactive/Pixelorama 로 editable sprite sources + PNG atlas/JSON; Tiled https://github.com/mapeditor/tiled 로 배경/층/계단 tilemap. 신규 캐릭터와 배경의 구체적인 아트 제작·검수 기준은 5.1 및 `docs/TOWER-ART-DIRECTION.md`를 따른다. 원본 소스·atlas·manifest·license/credits 유지. 새 리소스는 별도 lazy chunk/용량 예산. 원본 캐릭터 얼굴을 임의 재해석하거나 기존 학습 단계 리소스를 교체하지 않는다.
+- 5개 시각 테마는 실제 온스의 캐릭터 3종과 기존 한국풍 서재 배경 3종을 기준으로 한다. Bronze=기존 1단계 녹색 책·네이비 가디건, Silver=기존 2단계 보랏빛 재킷·펜·책, Gold=기존 3단계 짙은 정장·저울 문양 법전. Platinum/Diamond만 동일 얼굴과 체형을 유지한 신규 고급 정장·법전·조명/등급 장식으로 확장. 세부 가이드는 `docs/TOWER-ART-DIRECTION.md`. 캐릭터·배경·음원 사용 허락 확인 전 공개 금지.
 - tower tiles: 앞/중간/배경 3층 parallax, 반복 가능한 층·계단·문·창·구름, 층별 장식 변주, 10층마다 체크포인트 연출, 50층마다 풍경 전환(보상 룰과 독립). 올바른 답→0.5~0.8초 climb(6~10프레임)+camera pan/easing+작은 파티클→다음 문제, 오답→2~4프레임 표정/하트 변화, 승급→1~1.5초 전용 연출 후 스킵 가능. idle 4~6, walk/climb 6~10, cheer 6~8, miss 4~6 frames; 모션 줄이기 지원. 장면은 점진 이동/재활용 pool, 수천층 전부 로드 금지. 고퀄리티 판단은 실제 assets+mobile recording 및 승인으로, placeholder/AI rough는 완성으로 기록 금지.
 - UX: 게임 상단은 현재층, 남은 하트(도전), 내 티어, 타이머, sound, 종료. 장면 아래 읽기 편한 문제와 OX 버튼, canvas가 입력/스크롤 가리지 않음. 정답/오답 상태 서버 응답을 기다리고 중복 탭 방지. 결과는 최고층·정답/오답·등급·랭킹·오답 복습·종료. 사운드/캐릭터는 정답률 또는 공부 시간에 악영향 없는지 검증.
+
+### 5.1 원본 기반 고퀄리티 도트 제작 (2026-11-25)
+- 현재 온스 `public/characters/teacher.webp`, `teacher-reactions.webp`, `public/challenge/archive-scenes.webp`의 실제 이미지 확인 완료. 앞머리/둥근 안경/얼굴/비례/정장·법전 소품을 정체성의 기준으로 고정. 이전 단순 도형 UI 시안은 최종 아트로 사용하지 않는다.
+- 32비트 JRPG풍의 세밀한 수작업 픽셀 아트(고정 팔레트, 의도적 픽셀 클러스터, 깨끗한 투명 경계, 방향광). 초안은 기준 캐릭터를 참고하되 최종 프레임별 검수와 픽셀 보정 필수. 게임용 128×160 논리 셀(초기 제안), 별도 256px 이상 티어 초상화, 640×360 장면 마스터(초기 제안), nearest-neighbor 및 정수 픽셀 배율. 아트는 학습 흐름과 독립적으로 개선할 수 있는 atlas/manifest 기반.
+- 브론즈/실버/골드 기본형 및 표정을 원본에서 재사용/재작업 → 플래티넘/다이아몬드 추가 → idle/walk/climb/correct/miss/promotion 모션 → 무한 스크롤 배경/층/카메라 → 실제 모바일 프레임/정체성 검수. 세부 납품 기준은 아트 가이드 참조. 새 그래픽은 아직 미제작.
 
 ## 6. 관리자 웹 / GPT MCP
 - 관리자 메뉴: 대시보드, 인증 대기열/사진 상세/재제출, 코드 발급/폐기/이력, 회원·권한·정지, 교재/문제 검색·수정 미리보기·오류 신고·법령/판례 근거·버전 이력·롤백, 랭킹/부정 기록/시즌·룰 미리보기, 릴리스/장애/보안 이벤트, 개인정보/삭제 대장. 숫자는 실제 API 데이터, 빈/로딩/실패 상태, 검색/필터/페이지네이션, 위험 조치 확인.
