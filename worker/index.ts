@@ -1,11 +1,19 @@
 import { json } from './http'
 import { fingerprintedAsset } from '../shared/static-assets'
+import { accountRoutes } from './routes/account'
 
 export interface AppEnv {
   ONS_ENV: 'local' | 'staging' | 'production'
   ASSETS: Fetcher
   DB: D1Database
   PRIVATE_FILES: R2Bucket
+  APP_ORIGIN?: string
+  BETTER_AUTH_SECRET?: string
+  GOOGLE_CLIENT_ID?: string
+  GOOGLE_CLIENT_SECRET?: string
+  RESEND_API_KEY?: string
+  MAIL_FROM?: string
+  AUTH_EMAIL_MODE?: string
 }
 
 export default {
@@ -21,16 +29,16 @@ export default {
     if (read && url.pathname === '/api/v1/health') {
       return json({ ok: true }, 200, method)
     }
-    if (read && url.pathname === '/api/v1/session') {
-      return json({ error: 'login_required' }, 401, method)
-    }
+    const account = await accountRoutes(request, env, url)
+    if (account) return account
 
-    const isShell = url.pathname === '/'
+    const isShell = url.pathname === '/' || url.pathname === '/account'
     if (!read || (!isShell && !fingerprintedAsset.test(url.pathname.slice(1)))) {
       return json({ error: 'not_found' }, 404, method)
     }
 
-    const asset = await env.ASSETS.fetch(request)
+    const assetRequest = isShell ? new Request(new URL('/', url), { method }) : request
+    const asset = await env.ASSETS.fetch(assetRequest)
     if (asset.status >= 400) return json({ error: 'not_found' }, 404, method)
 
     const response = new Response(asset.body, asset)
@@ -38,6 +46,7 @@ export default {
     response.headers.set('X-Robots-Tag', 'noindex, nofollow')
     if (isShell) {
       response.headers.set('Cache-Control', 'no-store')
+      response.headers.set('Referrer-Policy', 'no-referrer')
       response.headers.set('Content-Security-Policy', [
         "default-src 'self'", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'",
       ].join('; '))

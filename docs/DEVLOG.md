@@ -1,11 +1,19 @@
 # 개발 기록
 
+## 2026-11-25 · P0-B 1차 계정 인증과 교재 이용권 등록
+
+- `worker/{auth/config.ts,routes/account.ts,http.ts,index.ts}`, 앱 Wrangler 설정, `migrations/0001_auth.sql`에 Better Auth 1.7.28과 D1 연결을 추가했다. 이메일 회원가입·인증·로그인·재설정·로그아웃, 세션 회수, Cloudflare IP 기반 D1 원자적 요청 제한, Google OAuth 진입을 구현했다. 자동 계정 병합을 비활성화했다. 브라우저에는 HttpOnly 세션 쿠키를 보내고 JSON에서 세션 토큰을 제외한다. Better Auth는 MIT 라이선스이며 기본 D1 어댑터를 사용했다. [Better Auth Cloudflare 가이드](https://better-auth.com/docs/guides/cloudflare)
+- `migrations/0002_purchase_access.sql`과 `worker/services/book-access.ts`에 구매 신청·계정 귀속 코드 해시·이용권·감사 이벤트 구조를 추가했다. 승인된 요청과 연결된 코드만 해당 계정이 사용할 수 있다. 한 D1 변경과 트리거에서 등록·권한 부여·감사 기록을 처리한다. 인증 권한은 요청마다 다시 확인하며 교재 캠페인의 종료 경계는 2027-03-15 00:00 KST다. 코드 발급은 아직 관리자 UI와 연결되지 않아 통합 테스트는 승인 레코드와 코드를 합성한다.
+- `src/features/auth/AccountPage.tsx`와 `cloudflare/web/`에서 가입, 인증 재발송, 로그인·재설정, 이용권 등록 화면을 연결했다. `package.json`/잠금 파일, `.github/workflows/ons2.yml`, `tests/{ons2-auth-runtime.mjs,ons2-browser.mjs}`에 확인 경로를 추가했다. 실제 스테이징 OAuth 콜백 경로와 Secret 이름은 `docs/ONS2-STAGING.md`에 있다.
+- `npm test` 22개, `npm run build:ons2` 및 정적 산출물 검사 3개, `npm run test:ons2:runtime` 6개, `npm run test:ons2:browser` Chromium 2개를 통과했다. 로컬 D1에 마이그레이션 두 개를 적용했다. 브라우저에서 320px과 1280px 키보드 포커스·가로 넘침·가입 응답을 확인했다. 화면 캡처는 `.ons2/qa/account-320.png`, `.ons2/qa/account-1280.png`다. 최초 통합 실행에서는 서로 다른 테스트의 요청 제한 카운터가 섞였다. 테스트 사이 카운터를 초기화해 분리했고 실제 제한 정책은 유지했다.
+- 남은 P0-B는 사진 제출·검토 및 파기, 관리자 MFA/권한 화면, 발급·폐기 흐름, 실제 Google 콜백과 Resend 발송이다. P0-C 이후 문제 전달·채점, 리비전 검증/수정, 인증 MCP, 탑·랭크·아트는 미구현이다. 운영 자원에는 마이그레이션을 적용하지 않았다. 롤백 시 계정 라우트와 Worker 코드를 이전 단계로 되돌리고, 계정 데이터를 담을 D1 테이블은 보존한다.
+
 ## 2026-11-25 · P0-A Worker 빌드 분리 및 Git 교재 JSON 정리
 
 - 사용자 승인으로 원격 네 브랜치 이력에서 `public/book/`의 JSON 28개를 제거했다. 검증 복제본에서는 Git 객체 정합성, JSON 제거 및 35개 원래 커밋의 교재 이외 전체 트리를 확인했다. `main` 이력 갱신 커밋에 `[skip ci]`를 넣었고, 운영 홈과 `release.json`은 전후에 모두 HTTP 200이고 SHA-256이 같았다. 정리된 `main`의 교재 경로는 404다. GitHub PR #1의 이전 merge 참조와 이전 커밋의 직접 주소(HTTP 200)는 GitHub 측에 남아 있다. 운영 Pages는 소유자 선택으로 유지했다.
 - `cloudflare/`, `worker/`, `shared/static-assets.ts`, `tsconfig.worker.json`, `package.json`/잠금 파일, `.node-version`에 같은 React·TypeScript·Vite를 사용하는 독립 Workers 진입점과 로컬 D1·private R2·별도 MCP KV 바인딩을 추가했다. 배포 경로는 `.ons2/client`다. 기존 Pages 진입점은 회귀 검증에만 사용했다. 새 Workers 앱은 소개 화면과 헬스 체크만 열며 MCP 입구는 503을 반환한다.
 - `.gitignore`, `.github/workflows/ons2.yml`, `scripts/verify_worker_assets.mjs`, `tests/{fixtures.ts,synthetic-book.ts,ons2-setup.test.ts,ons2-runtime.mjs}`에 원문 재추적 방지, 합성 데이터, 정적 산출물 검사와 실제 workerd 통합 테스트를 추가했다. 신규 CI는 빌드와 검사만 수행한다. 설정 절차와 경계는 `docs/ONS2-STAGING.md`, `docs/adr/0001-worker-boundary.md`에 기록했다.
-- 정리 전 기준 검증에서 교재 3,129문항·27개 장 파일 구조 검증, 단위 테스트 21개, 기존 Vite 빌드, Chromium 데스크톱·모바일 및 WebKit 브라우저 테스트 28개를 통과했다. 임시 공개판 전용 9개는 전체판 실행에서 설계대로 건너뛰었다. 원본 HWPX를 재추출하는 비교는 이번에 수행하지 않았다.
+- 기준 검증에서 교재 3,129문항·27개 장 파일 구조 검증, 단위 테스트 21개, 기존 Vite 빌드, Chromium 데스크톱·모바일 및 WebKit 브라우저 테스트 전체판 28개와 임시 공개판 17개를 통과했다. 원본 HWPX를 재추출하는 비교는 이번에 수행하지 않았다. 비교에 쓴 로컬 임시 복제본의 Git 이력과 테스트 산출물에서도 교재 JSON을 제거하고 확인했다.
 - 정리 후 `npm test` 22개, `npm run build:ons2` 및 정적 파일 검사 3개, `npm run test:ons2:runtime` 3개를 통과했다. 첫 런타임 실행은 샌드박스의 로컬 TCP 제약으로 실패하여 동일 명령을 루프백 허용 환경에서 다시 확인했다. `npm audit`는 기존 Pages 도구 체인의 `glob`, `minimatch`, `vite-plugin-pwa`, `workbox-build`에서 보통 등급 4개를 보고했다.
 - 검증 대기 항목은 비공개 개발 저장소, 권리 확인, 외부 스테이징 자원 및 스모크 테스트다. 운영 배포는 실행하지 않았다. 로컬 Worker 변경의 롤백은 이 단계 커밋만 되돌린다. 교재가 포함된 과거 Git 참조를 되살리지 않는다.
 

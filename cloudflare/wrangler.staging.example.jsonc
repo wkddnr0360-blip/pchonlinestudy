@@ -3,10 +3,11 @@
   "name": "pch-ons2-staging",
   "main": "../worker/index.ts",
   "compatibility_date": "2026-11-25",
+  "compatibility_flags": ["nodejs_compat"],
   "account_id": "REPLACE_WITH_STAGING_ACCOUNT_ID",
   "workers_dev": false,
   "preview_urls": false,
-  "vars": { "ONS_ENV": "staging" },
+  "vars": { "ONS_ENV": "staging", "APP_ORIGIN": "https://REPLACE_WITH_STAGING_HOST" },
   "assets": {
     "directory": "../.ons2/client",
     "binding": "ASSETS",

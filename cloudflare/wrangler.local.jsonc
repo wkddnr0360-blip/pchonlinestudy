@@ -3,9 +3,10 @@
   "name": "pch-ons2-local",
   "main": "../worker/index.ts",
   "compatibility_date": "2026-11-25",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
-  "vars": { "ONS_ENV": "local" },
+  "vars": { "ONS_ENV": "local", "APP_ORIGIN": "http://127.0.0.1:8787" },
   "assets": {
     "directory": "../.ons2/client",
     "binding": "ASSETS",

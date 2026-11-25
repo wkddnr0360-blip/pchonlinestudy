@@ -1,6 +1,10 @@
 :root {
+  --ons-blue: #0059c7;
+  --ons-ink: #191a1d;
+  --ons-secondary: #52525b;
+  --ons-border: #b8bdc7;
   font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", sans-serif;
-  color: #191a1d;
+  color: var(--ons-ink);
   background: #f5f5f7;
   line-height: 1.55;
   word-break: keep-all;
@@ -12,7 +16,7 @@ body {
 
 main {
   width: min(42rem, calc(100% - 3rem));
-  margin: clamp(4rem, 18vh, 12rem) auto;
+  margin: clamp(2rem, 10vh, 7rem) auto;
 }
 
 h1 {
@@ -23,5 +27,64 @@ h1 {
 }
 
 p {
-  color: #52525b;
+  color: var(--ons-secondary);
+}
+
+.ons-header {
+  display: flex;
+  padding-inline: max(1.5rem, calc((100vw - 58rem) / 2));
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #e0e1e6;
+}
+
+.ons-header a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 3.5rem;
+  color: var(--ons-ink);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.ons-account { max-width: 27rem; }
+.ons-account h1 { font-size: clamp(1.9rem, 6vw, 2.65rem); }
+
+.ons-panel {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 5vw, 1.75rem);
+  margin-top: 1.25rem;
+  border-radius: 1.15rem;
+  background: #fff;
+  box-shadow: 0 0.5rem 1.5rem #0d23410a;
+}
+
+.ons-panel form, .ons-panel label, .ons-identity { display: grid; gap: 0.5rem; }
+.ons-panel form { gap: 1rem; }
+.ons-panel p { margin: 0; }
+.ons-identity span { overflow-wrap: anywhere; }
+
+.ons-panel input, .ons-panel button, .ons-button {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 2.75rem;
+  border-radius: 0.65rem;
+  padding: 0.6rem 0.8rem;
+  font: inherit;
+}
+
+.ons-panel input { width: 100%; border: 1px solid var(--ons-border); color: var(--ons-ink); }
+.ons-panel button, .ons-button { border: 1px solid transparent; background: var(--ons-blue); color: #fff; cursor: pointer; }
+.ons-button { display: inline-flex; align-items: center; text-decoration: none; }
+.ons-panel button.ons-secondary { background: #fff; border-color: var(--ons-border); color: var(--ons-ink); }
+.ons-panel button:disabled { cursor: wait; opacity: 0.68; }
+.ons-actions { display: flex; flex-wrap: wrap; }
+.ons-actions button { background: transparent; color: var(--ons-blue); padding-inline: 0.5rem; }
+.ons-notice, .ons-error { margin-top: 1rem; padding: 0.7rem; border-radius: 0.65rem; background: #e8f2ff; }
+.ons-error { background: #ffece9; color: #78130c; }
+
+:focus-visible {
+  outline: 3px solid var(--ons-blue);
+  outline-offset: 3px;
 }
