@@ -35,7 +35,11 @@ type AuthSettings = NonNullable<ReturnType<typeof authSettings>>
 async function sendAccountEmail(env: AppEnv, settings: AuthSettings, kind: 'verify' | 'reset', email: string, url: string) {
   if (settings.testMail) {
     if (!email.endsWith('@example.test')) throw new Error('Synthetic email address required')
-    await env.PRIVATE_FILES.put(`test-mail/${kind}/${email}`, url)
+    await env.DB.batch([
+      env.DB.prepare('CREATE TABLE IF NOT EXISTS local_mail_fixtures (kind TEXT, email TEXT, url TEXT NOT NULL, PRIMARY KEY (kind, email))'),
+      env.DB.prepare('INSERT INTO local_mail_fixtures (kind, email, url) VALUES (?, ?, ?) ON CONFLICT (kind, email) DO UPDATE SET url = excluded.url')
+        .bind(kind, email, url),
+    ])
     return
   }
 

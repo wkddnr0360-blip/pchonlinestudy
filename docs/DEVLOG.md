@@ -1,5 +1,12 @@
 # 개발 기록
 
+## 2026-11-26 · 구매 사진 D1 전환과 자동 압축
+
+- `src/features/auth/{PurchaseForm.tsx,purchase-photo.ts}`와 `shared/purchase.ts`에서 브라우저가 열 수 있는 사진을 JPEG로 변환한다. 화질을 먼저 조정하고 필요하면 해상도를 낮춰 512 KiB 이내로 제한한다. HEIC/HEIF를 열 수 없는 브라우저에는 JPEG·PNG 안내를 표시한다. 기존 Worker의 JPEG 재인코딩은 일부 카메라 크기의 합성 이미지에서 디코더 메모리 제한을 넘었다. `worker/services/purchase-photo-jpeg.ts`는 JPEG 구조와 크기를 검사하고 EXIF 등 메타데이터 구간을 제거한다.
+- `migrations/0008_purchase_photos.sql`, `worker/{routes,services}/purchases.ts`, `worker/jobs/purchase-photos.ts`에서 비공개 D1 사진 테이블, 신청과 이미지의 원자적 저장, 관리자 전용 조회, 승인 후 7일 파기 및 감사 기록을 연결했다. 앱 Worker와 Wrangler 설정의 R2 바인딩을 제거했다. `worker/auth/config.ts`의 로컬 합성 메일은 별도 D1 테이블을 사용한다. MCP OAuth 전용 KV와 공개 정적 자산의 배포 방식은 기존 구성을 따른다.
+- 단위 22개, Worker 8개, Chromium·WebKit 13개 및 정적 자산 27개 검사를 통과했다. 서버에서 초과·잘린 사진을 차단하고 중복 요청에서도 사진 1개만 저장됨을 확인했다. Chromium과 WebKit에서 1,800×1,400 PNG의 자동 압축과 D1 저장을 확인했다. 관리자 조회와 7일 삭제, 사진 파기 후 티켓 및 이용권을 검증했다.
+- 외부 스테이징 D1의 기존 신청과 R2 사진 연결이 각각 0건이었다. `0008_purchase_photos.sql` 적용 후 남은 마이그레이션이 없음을 확인했다. 스테이징 Worker의 빌드 모의 실행에서 앱에 D1과 Static Assets가 연결됨을 확인했다. 별도 호스트, 앱 계정 실연동, 외부 스테이징의 실행 검증 및 운영 배포는 대기 중이다. D1 복구 이력과 전환 절차는 `docs/ONS2-STAGING.md`에 기록했다.
+
 ## 2026-11-26 · 구매 승인 사진 7일 보관
 
 - `worker/jobs/purchase-photos.ts`, `shared/purchase.ts`, `src/features/auth/PurchaseForm.tsx`에 승인일 기준 7일 보관과 신청자 안내를 적용했다. 스테이징 설정에 매시간 Cron Trigger를 추가했다. 승인 사진 파기 후에도 승인 상태, 티켓, 이용권과 파기 감사 기록을 보존한다. 대기 사진은 검토용으로 유지하며 반려·재제출 사진은 환경별 기존 설정을 적용한다.

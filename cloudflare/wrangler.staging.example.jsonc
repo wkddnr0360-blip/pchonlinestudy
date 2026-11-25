@@ -21,6 +21,5 @@
     "database_name": "pch-ons2-staging",
     "database_id": "REPLACE_WITH_STAGING_D1_ID",
     "migrations_dir": "../migrations"
-  }],
-  "r2_buckets": [{ "binding": "PRIVATE_FILES", "bucket_name": "pch-ons2-private-staging" }]
+  }]
 }

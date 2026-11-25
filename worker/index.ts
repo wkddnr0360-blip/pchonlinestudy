@@ -8,7 +8,6 @@ export interface AppEnv {
   ONS_ENV: 'local' | 'staging' | 'production'
   ASSETS: Fetcher
   DB: D1Database
-  PRIVATE_FILES: R2Bucket
   APP_ORIGIN?: string
   BETTER_AUTH_SECRET?: string
   GOOGLE_CLIENT_ID?: string
@@ -29,7 +28,7 @@ export default {
     const url = new URL(request.url)
     const { method } = request
 
-    if (!env.ASSETS || !env.DB || !env.PRIVATE_FILES || !['local', 'staging', 'production'].includes(env.ONS_ENV)) {
+    if (!env.ASSETS || !env.DB || !['local', 'staging', 'production'].includes(env.ONS_ENV)) {
       return json({ error: 'service_unavailable' }, 503, method)
     }
 

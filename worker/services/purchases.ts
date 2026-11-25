@@ -1,23 +1,7 @@
-import { decode, encode } from 'jpeg-js'
 import type { AdminPurchase, PurchaseFilter, PurchaseQueue, PurchaseRequest, PurchaseStatus, PurchaseTicket } from '../../shared/purchase'
 import { bookCampaign, createTicketCode, ticketHash } from './book-access'
 
-const photoPrefix = 'verification/'
-export const photoSizeLimit = 3 * 1024 * 1024
-
-export function cleanPurchasePhoto(bytes: Uint8Array): Uint8Array | null {
-  if (bytes.length < 4 || bytes.length > photoSizeLimit || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null
-  try {
-    const { width, height, data } = decode(bytes, {
-      useTArray: true, tolerantDecoding: false, maxResolutionInMP: 1.7, maxMemoryUsageInMB: 20,
-    })
-    if (width < 160 || height < 160 || width > 1280 || height > 1280) return null
-    const jpeg = encode({ width, height, data }, 85).data
-    return jpeg.length <= photoSizeLimit ? jpeg : null
-  } catch {
-    return null
-  }
-}
+const hasPhoto = 'EXISTS (SELECT 1 FROM purchase_request_photos WHERE purchase_id = req.id)'
 
 const requestColumns = `req.id, req.cafe_nickname AS cafeNickname, req.status, req.submitted_at AS submittedAt,
   req.reviewed_at AS reviewedAt, req.review_note AS reviewNote`
@@ -28,32 +12,25 @@ export function latestPurchase(db: D1Database, userId: string) {
     .bind(userId, bookCampaign).first<PurchaseRequest>()
 }
 
-export async function createPurchase(db: D1Database, files: R2Bucket, userId: string, nickname: string, photo: Uint8Array, now: number) {
+export async function createPurchase(db: D1Database, userId: string, nickname: string, photo: Uint8Array, now: number) {
   const id = crypto.randomUUID()
-  const key = photoPrefix + id + '.jpg'
-  await files.put(key, photo, { httpMetadata: { contentType: 'image/jpeg', cacheControl: 'private, no-store' } })
-
-  const result = await db.prepare(`
-    INSERT INTO purchase_requests (id, user_id, campaign_id, cafe_nickname, photo_key, status, submitted_at)
-    SELECT ?, ?, ?, ?, ?, 'pending', ?
-    WHERE EXISTS (SELECT 1 FROM book_campaigns WHERE id = ? AND ends_at > ?)
-      AND NOT EXISTS (SELECT 1 FROM member_controls WHERE user_id = ? AND suspended_at IS NOT NULL)
-    ON CONFLICT DO NOTHING
-  `).bind(id, userId, bookCampaign, nickname, key, now, bookCampaign, now, userId).run().catch(async (error: unknown) => {
-    // A transport failure may follow a committed insert. Keep any photo already linked to its request.
-    const recorded = await db.prepare('SELECT id FROM purchase_requests WHERE id = ?').bind(id).first().catch(() => undefined)
-    if (recorded === null) await files.delete(key).catch(() => undefined)
-    throw error
-  })
-  if (!result.meta.changes) {
-    await files.delete(key)
-    return null
-  }
+  const [result] = await db.batch([
+    db.prepare(`
+      INSERT INTO purchase_requests (id, user_id, campaign_id, cafe_nickname, status, submitted_at)
+      SELECT ?, ?, ?, ?, 'pending', ?
+      WHERE EXISTS (SELECT 1 FROM book_campaigns WHERE id = ? AND ends_at > ?)
+        AND NOT EXISTS (SELECT 1 FROM member_controls WHERE user_id = ? AND suspended_at IS NOT NULL)
+      ON CONFLICT DO NOTHING
+    `).bind(id, userId, bookCampaign, nickname, now, bookCampaign, now, userId),
+    db.prepare(`INSERT INTO purchase_request_photos (purchase_id, jpeg)
+      SELECT id, ? FROM purchase_requests WHERE id = ?`).bind(photo, id),
+  ])
+  if (!result.meta.changes) return null
   return { id, cafeNickname: nickname, status: 'pending', submittedAt: now, reviewedAt: null, reviewNote: null } satisfies PurchaseRequest
 }
 
 type PurchaseRow = PurchaseRequest & {
-  photoKey: string | null
+  photoPresent: 0 | 1
   codeId: string | null
   issuedAt: number | null
   expiresAt: number | null
@@ -62,12 +39,12 @@ type PurchaseRow = PurchaseRequest & {
 }
 
 const joins = 'FROM purchase_requests req LEFT JOIN access_codes code ON code.id = req.last_code_id'
-const columns = `${requestColumns}, req.photo_key AS photoKey, code.id AS codeId,
+const columns = `${requestColumns}, ${hasPhoto} AS photoPresent, code.id AS codeId,
   code.issued_at AS issuedAt, code.expires_at AS expiresAt, code.redeemed_at AS redeemedAt, code.revoked_at AS revokedAt`
 
-function toAdminPurchase({ photoKey, codeId, issuedAt, expiresAt, redeemedAt, revokedAt, ...request }: PurchaseRow): AdminPurchase {
+function toAdminPurchase({ photoPresent, codeId, issuedAt, expiresAt, redeemedAt, revokedAt, ...request }: PurchaseRow): AdminPurchase {
   return {
-    ...request, hasPhoto: photoKey !== null,
+    ...request, hasPhoto: Boolean(photoPresent),
     ticket: codeId && issuedAt !== null && expiresAt !== null ? { id: codeId, issuedAt, expiresAt, redeemedAt, revokedAt } : null,
   }
 }
@@ -106,21 +83,20 @@ export async function ticketHistory(db: D1Database, requestId: string) {
   return results
 }
 
-export async function purchasePhoto(db: D1Database, files: R2Bucket, requestId: string, adminId: string) {
-  const row = await db.prepare('SELECT photo_key AS photoKey FROM purchase_requests WHERE id = ?')
-    .bind(requestId).first<{ photoKey: string | null }>()
-  if (!row?.photoKey) return null
-  const object = await files.get(row.photoKey)
-  if (!object) return null
+export async function purchasePhoto(db: D1Database, requestId: string, adminId: string) {
+  const jpeg = await db.prepare(`SELECT photo.jpeg FROM purchase_request_photos photo
+    JOIN purchase_requests req ON req.id = photo.purchase_id WHERE req.id = ? AND req.campaign_id = ?`)
+    .bind(requestId, bookCampaign).first<number[]>('jpeg')
+  if (!jpeg) return null
   await db.prepare('INSERT INTO audit_events (id, actor_user_id, action, target_id, occurred_at) VALUES (?, ?, ?, ?, ?)')
     .bind(crypto.randomUUID(), adminId, 'purchase_photo_viewed', requestId, Date.now()).run()
-  return object
+  return Uint8Array.from(jpeg)
 }
 
 export async function reviewPurchase(db: D1Database, requestId: string, adminId: string, next: Exclude<PurchaseStatus, 'pending'>, note: string, now: number) {
   const result = await db.prepare(`
-    UPDATE purchase_requests SET status = ?, review_note = ?, reviewed_at = ?, reviewed_by = ?
-    WHERE id = ? AND status = 'pending' AND photo_key IS NOT NULL
+    UPDATE purchase_requests AS req SET status = ?, review_note = ?, reviewed_at = ?, reviewed_by = ?
+    WHERE id = ? AND status = 'pending' AND ${hasPhoto}
       AND EXISTS (SELECT 1 FROM member_roles WHERE user_id = ? AND role = 'admin')
   `).bind(next, note || null, now, adminId, requestId, adminId).run()
   return Boolean(result.meta.changes)

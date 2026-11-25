@@ -13,7 +13,7 @@
 
 ## 1. 모듈형 아키텍처
 - 기존 src를 유지하며 src/features/{auth,account,verification,study,exam,review,tower,ranking,admin}, src/ui/{primitives,patterns,tokens}, src/game/{renderer,scenes,sprites,assets}, worker/{routes,middleware,services,repositories,auth,jobs}, shared/{contracts,domain}, migrations, tests/{unit,integration,e2e,visual}, docs/adr로 점진 분리한다. 큰 이동 PR 대신 기능별 이전. UI→서비스 API→도메인→저장소 방향, 서버 모듈 클라이언트 import 금지.
-- Cloudflare Workers + Static Assets(React/Vite), same-origin /api/v1; D1 DB, private R2 구매 사진/원본 보관, 별도 MCP Worker + service binding. OAuth KV는 프로토콜 상태에만 사용; 권한·코드·점수의 원장은 D1. 관리자 웹과 MCP는 같은 서비스/검증 함수 호출.
+- Cloudflare Workers + Static Assets(React/Vite), same-origin /api/v1, D1 DB, 별도 MCP Worker + service binding. 구매 인증 사진은 최대 512 KiB JPEG를 D1 별도 테이블에 비공개로 저장한다. OAuth KV는 프로토콜 상태에만 사용하며 권한·코드·점수의 원장은 D1이다. 관리자 웹과 MCP는 같은 서비스/검증 함수 호출.
 - 공식 문서 https://developers.cloudflare.com/workers/framework-guides/web-apps/react/ ; https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/ ; https://developers.cloudflare.com/agents/model-context-protocol/protocol/authorization/
 - D1 제안: users, auth accounts/sessions/verifications, roles, book_campaigns, rank_seasons, purchase_requests, access_codes, entitlements, books, questions, question_revisions, question_references, correction_requests, study_sessions, attempts, exam_runs, exam_items, reports, tower_runs, tower_turns, tower_progress, rank_bests, rank_snapshots, moderation_events, audit_events, idempotency_receipts. FK, unique(season,user), unique(run,turn), unique(code hash), 정합성 인덱스, revision 및 UTC timestamps. 쿼리 bound params, migration은 버전 관리. D1 batch/조건부 쓰기/제약으로 원자성 검증, 지원되지 않는 transaction API 가정 금지.
 - 기존 3,129개 ID/번호/원문/표/해설·교재 버전 유지, 별도 서버 import 및 원본 SHA 검증. 수정은 원본 덮어쓰기 금지, 검증된 revision overlay로 표시. 기존 import/verify 지침과 충돌하지 않게 AGENTS.md를 승인된 새 규칙으로 갱신.
@@ -23,7 +23,7 @@
 - Google OAuth + 자체 이메일/비밀번호만 출시. 네이버/카카오는 provider 확장점만 설계. Better Auth + Drizzle D1 adapter 후보, 이메일 인증·비밀번호 재설정은 Resend 후보(도메인 인증/발송 제한 확인). verified email, 안정적 provider subject, 명시적 재인증 계정 연결; 동일 이메일만으로 자동 병합 금지. 비밀번호 해싱은 검증된 인증 라이브러리, 무차별 대입 제한, 열거 방지, CSRF/Origin/PKCE/state/nonce, HttpOnly Secure SameSite 쿠키, session revocation. 관리자 role은 서버에서 매번 검증, MFA 및 위험한 쓰기 재인증, 기본 거부.
 - 확정 권한: 로그인한 무료 회원은 1단계(504) 학습·번호 지정·1단계 오답 및 무한의 탑 일반모드(1단계 100%, 최대 Silver 개인 성장 티어) 이용. 유효한 교재 구매 인증 이용권 회원은 1/2/3단계 전체 3,129문항·실전 모의고사·일반모드(1/2단계)·Gold까지 승급·Gold 이상에서 도전모드(2/3단계 50:50)·시즌 경쟁 랭킹·명예의 전당 이용. 무료 회원의 순위 조회/경쟁 랭킹 등재·Gold 이상·도전모드 금지. 로그인 전에는 소개/권리자가 허용한 샘플만. 기존 1단계 실전 모의고사도 잠금. '유료회원'은 교재 인증 이용권을 가진 회원; 사이트 결제 기능 없음.
 - 교재 이용권 종료: 2027-03-15 00:00 KST exclusive (2027-03-14T15:00:00Z). 서버 UTC 판정, 요청별 확인, 만료·회수 후 인증 회원 전용 문제/정답·랭킹 접근 차단. 기본 1단계는 무료 유지로 제안(전체 서비스 종료 여부는 소유자 확정). 시즌 갱신과 만료/잠금 UX, 과거 랭크 보존.
-- 신청: 로그인 → 네이버 카페 닉네임 + 교재 포스트잇 손글씨 + 임시 촬영용 난수(추가 제안) → private R2 → 관리자 수동 검토 → approved/rejected/resubmit → 사용자 귀속 코드 발급 → 입력 → entitlement. 카페 닉네임은 네이버 로그인/카페 회원 자격을 증명하지 않음. 코드 CSPRNG 128bit 이상, 서버 hash만 저장, 사용자/시즌/승인 요청 귀속, 발급 만료 제안 7일, 재발급시 이전 코드 폐기, 1회 원자적 사용/재전송 idempotency. 코드 화면 1회 표시, 안전한 전달, 로그 금지. 승인·권한 변경 audit. 사진 크기/MIME 실제 확인·EXIF 제거·비공개, 접근 기록·개인정보처리방침·탈퇴. 승인 사진은 승인 후 7일이 지나면 자동 파기하고 승인·티켓·이용권 기록은 보존한다. 반려·재제출 사진의 보관 기간은 환경별로 설정한다. 원본 사진을 MCP 응답에 기본 포함하지 않음; 관리자 직접 조회 또는 명시적 제한 조회.
+- 신청: 로그인 → 네이버 카페 닉네임 + 교재 포스트잇 손글씨 + 임시 촬영용 난수(추가 제안) → 브라우저 JPEG 압축 및 비공개 D1 저장 → 관리자 수동 검토 → approved/rejected/resubmit → 사용자 귀속 코드 발급 → 입력 → entitlement. 카페 닉네임은 네이버 로그인/카페 회원 자격을 증명하지 않음. 코드 CSPRNG 128bit 이상, 서버 hash만 저장, 사용자/시즌/승인 요청 귀속, 발급 만료 제안 7일, 재발급시 이전 코드 폐기, 1회 원자적 사용/재전송 idempotency. 코드 화면 1회 표시, 안전한 전달, 로그 금지. 승인·권한 변경 audit. 사진 크기/형식 확인·EXIF 제거·비공개, 접근 기록·개인정보처리방침·탈퇴. 승인 사진은 승인 후 7일이 지나면 자동 파기하고 승인·티켓·이용권 기록은 보존한다. 반려·재제출 사진의 보관 기간은 환경별로 설정한다. 원본 사진을 MCP 응답에 기본 포함하지 않음; 관리자 직접 조회 또는 명시적 제한 조회.
 - 기존 브라우저 진도 마이그레이션은 사용자가 선택, 계정 격리, 임의 merge 금지. 서버 동기화는 stable question ID와 attempt events만. 민감 본문/해설/토큰은 IndexedDB, SW, backup, CDN, 정적 dist에 금지. 모의고사도 ID+사용자 답안만 저장. /api private,no-store; 과거 SW cache 이름 정리 및 안전한 업데이트/rollback 경로. 로그인 실패/네트워크 중단은 fail closed. 질문은 필요한 1개씩, 채점 서버, 해설은 제출 후; 시험/랭크 해설은 종료 이후, 복습에는 별도 권한 검사.
 
 ## 3. 일반 학습 및 전체 UI/UX
@@ -84,7 +84,7 @@
 
 ## 8. 구현 순서 및 출시 게이트
 P0-A baseline, 저장소/저작권/과거 배포 위험, 샘플 데이터, 비공개 Git, CF staging, API fail closed, CI artifact scan.
-P0-B D1 migrations/Google+email 회원가입/세션/관리자 권한, 이용권 만료, R2 사진, 승인/코드 원자성, 관리자 웹.
+P0-B D1 migrations/Google+email 회원가입/세션/관리자 권한, 이용권 만료, 비공개 D1 구매 사진, 승인/코드 원자성, 관리자 웹.
 P0-C 문제 API/채점/모의고사/오답/진도 migration, 번호 지정 회귀, PWA safe update, MCP OAuth/read/preview/apply/audit 및 실제 ChatGPT 연결. 인증 없는 API, 무료/만료/정지, 직접 URL, 빌드·SW·백업 문제 노출, 코드 2계정 동시 등록, CSRF/IDOR, admin revoke, token expiry, stale revision/idempotency 검증.
 P1-A UI design tokens, 홈/학습/계정/모의고사/관리자 반응형·a11y·visual snapshots. 모든 기존 기능 보존.
 P1-B 무료/인증 일반모드 분기·Silver 상한·도전모드/순위·점수 서버 검증, 관리자 rank rules preview, 부정 기록/재산정, 기존 챌린지 전환. feature flag로 닫아두고 검증.

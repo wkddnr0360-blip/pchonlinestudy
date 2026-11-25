@@ -52,8 +52,8 @@ test('a mobile learner solves one printed number and moves only allowlisted lega
     })
     assert.equal(created.status(), 200)
     const env = await harness.getWorker().getEnv()
-    const verification = await env.PRIVATE_FILES.get('test-mail/verify/' + email)
-    await harness.fetch(await verification.text(), { redirect: 'manual' })
+    const verification = await env.DB.prepare("SELECT url FROM local_mail_fixtures WHERE kind = 'verify' AND email = ?").bind(email).first('url')
+    await harness.fetch(verification, { redirect: 'manual' })
     const authenticated = await page.request.post(baseURL + '/api/v1/auth/sign-in/email', { headers, data: { email, password } })
     assert.equal(authenticated.status(), 200)
 
@@ -197,6 +197,64 @@ for (const width of [320, 390, 768, 1280]) {
       await page.getByRole('status').filter({ hasText: '인증 링크' }).waitFor()
     } finally {
       await page.close()
+    }
+  })
+}
+
+for (const engine of [chromium, webkit]) {
+  test(`large photos are compressed in ${engine.name()} before saving to D1`, async () => {
+    const instance = engine === chromium ? browser : await engine.launch()
+    const page = await instance.newPage({ viewport: { width: 390, height: 844 } })
+    try {
+      const email = `purchase-${engine.name()}@example.test`
+      const password = 'Synthetic photo upload password!'
+      const headers = { Origin: baseURL }
+      const created = await page.request.post(baseURL + '/api/v1/auth/sign-up/email', {
+        headers, data: { email, password, name: '합성 사진 회원', callbackURL: baseURL + '/account' },
+      })
+      assert.equal(created.status(), 200)
+      const { DB } = await harness.getWorker().getEnv()
+      const verification = await DB.prepare("SELECT url FROM local_mail_fixtures WHERE kind = 'verify' AND email = ?").bind(email).first('url')
+      assert.equal((await harness.fetch(verification, { redirect: 'manual' })).status, 302)
+      const signedIn = await page.request.post(baseURL + '/api/v1/auth/sign-in/email', { headers, data: { email, password } })
+      assert.equal(signedIn.status(), 200)
+
+      await page.goto(baseURL + '/account')
+      const image = await page.evaluate(() => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 1800
+        canvas.height = 1400
+        const ctx = canvas.getContext('2d')
+        const pixels = ctx.createImageData(canvas.width, canvas.height)
+        let state = 17
+        for (let i = 0; i < pixels.data.length; i += 4) {
+          state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+          pixels.data[i] = state >>> 24
+          pixels.data[i + 1] = (state >>> 16) & 255
+          pixels.data[i + 2] = (state >>> 8) & 255
+          pixels.data[i + 3] = 255
+        }
+        ctx.putImageData(pixels, 0, 0)
+        return canvas.toDataURL('image/png').split(',')[1]
+      })
+      const buffer = Buffer.from(image, 'base64')
+      assert.ok(buffer.length > 512 * 1024)
+      const nickname = `합성 사진 ${engine.name()}`
+      await page.getByLabel('카페 닉네임').fill(nickname)
+      await page.getByLabel('교재 사진').setInputFiles({ name: 'camera-sized.png', mimeType: 'image/png', buffer })
+      const [submitted] = await Promise.all([
+        page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/purchase' && response.request().method() === 'POST'),
+        page.getByRole('button', { name: '구매 인증 신청' }).click(),
+      ])
+      assert.equal(submitted.status(), 201, await submitted.text())
+      await expect(page.getByRole('status').filter({ hasText: '검토 대기' })).toBeVisible()
+      const photo = await DB.prepare(`SELECT length(jpeg) AS size, hex(substr(jpeg, 1, 2)) AS magic
+        FROM purchase_request_photos JOIN purchase_requests ON purchase_id = id WHERE cafe_nickname = ?`).bind(nickname).first()
+      assert.equal(photo.magic, 'FFD8')
+      assert.ok(photo.size > 0 && photo.size <= 512 * 1024)
+    } finally {
+      await page.close()
+      if (engine !== chromium) await instance.close()
     }
   })
 }

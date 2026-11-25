@@ -1,8 +1,9 @@
 import type { AppEnv } from '../index'
-import type { PurchaseFilter } from '../../shared/purchase'
+import { purchasePhotoMaxBytes, type PurchaseFilter } from '../../shared/purchase'
 import { json, readLimitedBody, readSmallJson } from '../http'
 import { readMemberAccess } from '../services/book-access'
-import { adminPurchaseById, cleanPurchasePhoto, createPurchase, issueTicket, latestPurchase, photoSizeLimit, purchasePhoto, purchaseQueue, reviewPurchase, revokeTicket, ticketHistory } from '../services/purchases'
+import { cleanPurchasePhoto } from '../services/purchase-photo-jpeg'
+import { adminPurchaseById, createPurchase, issueTicket, latestPurchase, purchasePhoto, purchaseQueue, reviewPurchase, revokeTicket, ticketHistory } from '../services/purchases'
 
 export const purchasePath = '/api/v1/purchase'
 export const adminPrefix = '/api/v1/admin/'
@@ -26,7 +27,7 @@ export async function memberPurchaseRoute(request: Request, env: AppEnv, userId:
   }
   const contentType = request.headers.get('Content-Type') ?? ''
   if (!contentType.startsWith('multipart/form-data;')) return json({ error: 'invalid_media_type' }, 400)
-  const bytes = await readLimitedBody(request, photoSizeLimit + 4096)
+  const bytes = await readLimitedBody(request, purchasePhotoMaxBytes + 4096)
   if (!bytes) return json({ error: 'photo_too_large' }, 413)
   let form: FormData
   try {
@@ -39,9 +40,10 @@ export async function memberPurchaseRoute(request: Request, env: AppEnv, userId:
   if (typeof nickname !== 'string' || !nickname.trim() || nickname.trim().length > 60 || /\p{Cc}/u.test(nickname) || !(photo instanceof File) || photo.type !== 'image/jpeg') {
     return json({ error: 'invalid_application_fields' }, 400)
   }
+  if (photo.size > purchasePhotoMaxBytes) return json({ error: 'photo_too_large' }, 413)
   const clean = cleanPurchasePhoto(new Uint8Array(await photo.arrayBuffer()))
   if (!clean) return json({ error: 'invalid_photo' }, 422)
-  const purchase = await createPurchase(env.DB, env.PRIVATE_FILES, userId, nickname.trim(), clean, Date.now())
+  const purchase = await createPurchase(env.DB, userId, nickname.trim(), clean, Date.now())
   return purchase ? json({ purchase }, 201) : json({ error: 'purchase_exists' }, 409)
 }
 
@@ -67,8 +69,8 @@ export async function adminPurchaseRoute(request: Request, env: AppEnv, url: URL
     return json({ tickets: await ticketHistory(env.DB, action[1]) }, 200)
   }
   if (action && request.method === 'GET' && action[2] === 'photo') {
-    const photo = await purchasePhoto(env.DB, env.PRIVATE_FILES, action[1], adminId)
-    return photo ? new Response(photo.body, { headers: {
+    const photo = await purchasePhoto(env.DB, action[1], adminId)
+    return photo ? new Response(photo, { headers: {
       'Content-Type': 'image/jpeg', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
       'Cloudflare-CDN-Cache-Control': 'no-store',
     } }) : json({ error: 'not_found' }, 404)

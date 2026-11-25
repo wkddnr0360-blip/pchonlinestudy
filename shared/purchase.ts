@@ -36,3 +36,4 @@ export const purchaseStatusLabel: Record<PurchaseStatus, string> = {
 }
 
 export const approvedPurchasePhotoRetentionDays = 7
+export const purchasePhotoMaxBytes = 512 * 1024

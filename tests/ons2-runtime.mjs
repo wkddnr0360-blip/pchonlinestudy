@@ -46,11 +46,9 @@ test('legacy files, private objects and unknown API paths cannot fall through to
   assert.deepEqual(await response.json(), { error: 'login_required' })
 })
 
-test('local D1, private R2 and the separate MCP KV have runtime bindings', async () => {
+test('the app runs with D1 and Static Assets and the separate MCP Worker has KV', async () => {
   const app = await harness.getWorker('pch-ons2-local').getEnv()
   assert.equal((await app.DB.prepare('SELECT 1 AS ready').first()).ready, 1)
-  await app.PRIVATE_FILES.put('verification/synthetic.txt', '合成')
-  assert.equal(await (await app.PRIVATE_FILES.get('verification/synthetic.txt')).text(), '合成')
   assert.equal((await harness.fetch('/verification/synthetic.txt')).status, 404)
 
   const mcp = harness.getWorker('pch-ons2-mcp-local')

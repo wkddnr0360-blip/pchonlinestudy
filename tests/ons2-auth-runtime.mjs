@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { after, before, beforeEach, test } from 'node:test'
-import { encode } from 'jpeg-js'
+import { decode, encode } from 'jpeg-js'
 import { createTestHarness } from 'wrangler'
 import { seedSyntheticBook } from './ons2-book-fixture.mjs'
 
@@ -46,9 +46,9 @@ async function signup(email, password) {
 }
 
 async function verifyEmail(email) {
-  const message = await env.PRIVATE_FILES.get('test-mail/verify/' + email)
+  const message = await env.DB.prepare("SELECT url FROM local_mail_fixtures WHERE kind = 'verify' AND email = ?").bind(email).first('url')
   assert.ok(message, 'local synthetic verification message was delivered')
-  return harness.fetch(await message.text(), { redirect: 'manual' })
+  return harness.fetch(message, { redirect: 'manual' })
 }
 
 async function signIn(email, password) {
@@ -159,9 +159,9 @@ test('verified email sessions, password resets and revocation stay server-side',
 
   const reset = await api('/auth/request-password-reset', { body: { email, redirectTo: origin + '/account' } })
   assert.equal(reset.status, 200)
-  const message = await env.PRIVATE_FILES.get('test-mail/reset/' + email)
+  const message = await env.DB.prepare("SELECT url FROM local_mail_fixtures WHERE kind = 'reset' AND email = ?").bind(email).first('url')
   assert.ok(message)
-  const callback = await harness.fetch(await message.text(), { redirect: 'manual' })
+  const callback = await harness.fetch(message, { redirect: 'manual' })
   assert.equal(callback.status, 302)
   const token = new URL(callback.headers.get('location')).searchParams.get('token')
   assert.ok(token)
@@ -320,19 +320,32 @@ test('a verified member submits a private photo; an MFA admin issues and retires
   const photo = Buffer.concat([jpeg.subarray(0, 2), appSegment, embedded, jpeg.subarray(2)])
   const form = new FormData()
   form.set('nickname', '합성 카페 회원')
+  form.set('photo', new Blob([new Uint8Array(512 * 1024 + 1)], { type: 'image/jpeg' }), 'oversized.jpg')
+  assert.equal((await api('/purchase', { cookie: memberCookie, body: form })).status, 413)
+  form.set('photo', new Blob([photo.subarray(0, -2)], { type: 'image/jpeg' }), 'truncated.jpg')
+  assert.equal((await api('/purchase', { cookie: memberCookie, body: form })).status, 422)
   form.set('photo', new Blob([photo], { type: 'image/jpeg' }), 'fixture.jpg')
-  const submitted = await api('/purchase', { cookie: memberCookie, body: form })
+  const submissions = await Promise.all([
+    api('/purchase', { cookie: memberCookie, body: form }),
+    api('/purchase', { cookie: memberCookie, body: form }),
+  ])
+  assert.deepEqual(submissions.map(({ status }) => status).sort(), [201, 409])
+  const submitted = submissions.find((response) => response.ok)
   assert.equal(submitted.status, 201, await submitted.clone().text())
   const { purchase } = await submitted.json()
   assert.equal(purchase.status, 'pending')
-  assert.equal((await api('/purchase', { cookie: memberCookie, body: form })).status, 409)
+  const photoSize = (id) => env.DB.prepare('SELECT length(jpeg) AS bytes FROM purchase_request_photos WHERE purchase_id = ?').bind(id).first('bytes')
+  assert.equal(await env.DB.prepare('SELECT count(*) AS count FROM purchase_request_photos').first('count'), 1)
   const adminRequest = `/admin/purchases/${purchase.id}`
   assert.equal((await api(adminRequest + '/photo', { cookie: memberCookie })).status, 403)
   assert.equal((await harness.fetch(`${origin}/verification/${purchase.id}.jpg`)).status, 404)
   const savedPhoto = await api(adminRequest + '/photo', { cookie: adminCookie })
   assert.equal(savedPhoto.status, 200)
   assert.equal(savedPhoto.headers.get('cache-control'), 'private, no-store')
-  assert.equal(Buffer.from(await savedPhoto.arrayBuffer()).includes(embedded), false)
+  const savedBytes = Buffer.from(await savedPhoto.arrayBuffer())
+  assert.equal(savedBytes.includes(embedded), false)
+  assert.equal(decode(savedBytes, { useTArray: true }).width, 200)
+  assert.equal(await photoSize(purchase.id), savedBytes.length)
   assert.equal((await api(adminRequest + '/ticket', { body: { expectedTicketId: null }, cookie: adminCookie })).status, 409)
 
   const dayMs = 86_400_000
@@ -340,9 +353,8 @@ test('a verified member submits a private photo; an MFA admin issues and retires
     const cleanup = await worker.scheduled({ cron: '0 * * * *', scheduledTime: new Date(at) })
     assert.equal(cleanup.outcome, 'ok')
   }
-  const photoKey = `verification/${purchase.id}.jpg`
   await runPhotoCleanup(purchase.submittedAt + 31 * dayMs)
-  assert.ok(await env.PRIVATE_FILES.head(photoKey))
+  assert.ok(await photoSize(purchase.id))
 
   const review = await api(adminRequest + '/review', { body: { decision: 'approved' }, cookie: adminCookie })
   assert.equal(review.status, 200, await review.clone().text())
@@ -379,27 +391,26 @@ test('a verified member submits a private photo; an MFA admin issues and retires
   assert.equal((await api(`/admin/tickets/${second.ticket.id}/revoke`, { body: {}, cookie: adminCookie })).status, 409)
 
   const rejectedId = randomUUID()
-  const rejectedPhotoKey = `verification/${rejectedId}.jpg`
-  await env.PRIVATE_FILES.put(rejectedPhotoKey, jpeg)
   await env.DB.prepare(`INSERT INTO purchase_requests
-    (id, user_id, campaign_id, cafe_nickname, photo_key, status, submitted_at, reviewed_at, reviewed_by)
-    SELECT ?, user_id, campaign_id, '합성 반려', ?, 'rejected', submitted_at, reviewed_at, reviewed_by
-    FROM purchase_requests WHERE id = ?`).bind(rejectedId, rejectedPhotoKey, purchase.id).run()
+    (id, user_id, campaign_id, cafe_nickname, status, submitted_at, reviewed_at, reviewed_by)
+    SELECT ?, user_id, campaign_id, '합성 반려', 'rejected', submitted_at, reviewed_at, reviewed_by
+    FROM purchase_requests WHERE id = ?`).bind(rejectedId, purchase.id).run()
+  await env.DB.prepare('INSERT INTO purchase_request_photos (purchase_id, jpeg) VALUES (?, ?)').bind(rejectedId, jpeg).run()
 
   const approvedPhotoExpiry = detail.purchase.reviewedAt + 7 * dayMs
   await runPhotoCleanup(approvedPhotoExpiry - 1)
   assert.equal((await api(adminRequest + '/photo', { cookie: adminCookie })).status, 200)
   await runPhotoCleanup(approvedPhotoExpiry)
-  assert.equal(await env.PRIVATE_FILES.head(photoKey), null)
+  assert.equal(await photoSize(purchase.id), null)
   assert.equal((await api(adminRequest + '/photo', { cookie: adminCookie })).status, 404)
   const { purchase: afterCleanup } = await (await api(adminRequest, { cookie: adminCookie })).json()
   assert.equal(afterCleanup.hasPhoto, false)
   assert.equal(afterCleanup.status, 'approved')
   assert.equal(afterCleanup.ticket.redeemedAt, reviewed.ticket.redeemedAt)
   assert.equal((await (await api('/session', { cookie: memberCookie })).json()).access.bookVerified, true)
-  assert.ok(await env.PRIVATE_FILES.head(rejectedPhotoKey))
+  assert.ok(await photoSize(rejectedId))
   await runPhotoCleanup(detail.purchase.reviewedAt + 30 * dayMs)
-  assert.equal(await env.PRIVATE_FILES.head(rejectedPhotoKey), null)
+  assert.equal(await photoSize(rejectedId), null)
   assert.ok(await env.DB.prepare("SELECT 1 FROM audit_events WHERE target_id = ? AND action = 'purchase_photo_purged'").bind(purchase.id).first())
 
   const now = Date.now()
