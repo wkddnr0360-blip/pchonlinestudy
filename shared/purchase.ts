@@ -34,3 +34,5 @@ export interface PurchaseQueue {
 export const purchaseStatusLabel: Record<PurchaseStatus, string> = {
   pending: '검토 대기', approved: '승인', rejected: '반려', resubmit: '재제출 요청',
 }
+
+export const approvedPurchasePhotoRetentionDays = 7

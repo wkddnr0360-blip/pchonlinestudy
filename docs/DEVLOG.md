@@ -1,5 +1,14 @@
 # 개발 기록
 
+## 2026-11-26 · 구매 승인 사진 7일 보관
+
+- `worker/jobs/purchase-photos.ts`, `shared/purchase.ts`, `src/features/auth/PurchaseForm.tsx`에 승인일 기준 7일 보관과 신청자 안내를 적용했다. 스테이징 설정에 매시간 Cron Trigger를 추가했다. 승인 사진 파기 후에도 승인 상태, 티켓, 이용권과 파기 감사 기록을 보존한다. 대기 사진은 검토용으로 유지하며 반려·재제출 사진은 환경별 기존 설정을 적용한다.
+- `tests/ons2-auth-runtime.mjs`의 합성 D1·R2 테스트에서 만료 직전·직후, 대기 사진 보존, 기존 30일 반려 사진 파기와 티켓·이용권 보존을 확인했다. 단위 22개, Worker 8개, 브라우저 11개 및 정적 자산 27개 검사를 통과했다. 별도 스테이징의 실제 예약 실행 검증과 운영 적용은 대기 중이다.
+
+## 2026-11-26 · 운영 전환 사전 점검
+
+- `29fc3be` Worker 빌드와 정적 산출물 27개 검사를 다시 통과했다. 운영 주소는 GitHub Pages에서 200으로 응답하며 Workers 상태 경로는 404다. 외부 스테이징 D1은 문항과 회원 데이터 0건으로 확인했다. 목차·모의고사 마이그레이션 2개를 적용하고 미적용 항목이 없음을 확인했다. R2 활성화, 실제 교재 적재, 앱용 Google·이메일 인증 설정과 운영 주소 전환은 대기 중이다.
+
 ## 2026-11-26 · 3단계 홈·계층형 목차·서버 모의고사
 
 - `cloudflare/web/`에서 이전 홈의 민트·블루·라벤더 색상과 3종 철한쌤 포즈를 복원하고 작은 서재 도트를 더했다. 상단 패치노트, 모바일 아이콘 탐색, 읽기 상태를 연결했다. UI 공통 서체는 SUIT Variable WOFF2로 배포하며 OFL 원문을 함께 제공한다. 잠금 안내, 학습 설정 및 관리자 상세에는 Radix Dialog, 학습 방식에는 Radix Radio Group, 메뉴와 동작에는 Lucide를 적용했다. [이전 홈 색상](https://github.com/wkddnr0360-blip/pchonlinestudy/blob/main/src/app/home.css) · [SUIT](https://github.com/sun-typeface/SUIT) · [Radix](https://github.com/radix-ui/primitives) · [Lucide](https://github.com/lucide-icons/lucide)

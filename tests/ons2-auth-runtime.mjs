@@ -335,6 +335,15 @@ test('a verified member submits a private photo; an MFA admin issues and retires
   assert.equal(Buffer.from(await savedPhoto.arrayBuffer()).includes(embedded), false)
   assert.equal((await api(adminRequest + '/ticket', { body: { expectedTicketId: null }, cookie: adminCookie })).status, 409)
 
+  const dayMs = 86_400_000
+  const runPhotoCleanup = async (at) => {
+    const cleanup = await worker.scheduled({ cron: '0 * * * *', scheduledTime: new Date(at) })
+    assert.equal(cleanup.outcome, 'ok')
+  }
+  const photoKey = `verification/${purchase.id}.jpg`
+  await runPhotoCleanup(purchase.submittedAt + 31 * dayMs)
+  assert.ok(await env.PRIVATE_FILES.head(photoKey))
+
   const review = await api(adminRequest + '/review', { body: { decision: 'approved' }, cookie: adminCookie })
   assert.equal(review.status, 200, await review.clone().text())
   const issue = (expectedTicketId) => api(adminRequest + '/ticket', { body: { expectedTicketId }, cookie: adminCookie })
@@ -368,12 +377,32 @@ test('a verified member submits a private photo; an MFA admin issues and retires
   assert.ok(history.tickets.find((ticket) => ticket.id === first.ticket.id).revokedAt)
   assert.ok(history.tickets.find((ticket) => ticket.id === second.ticket.id).redeemedAt)
   assert.equal((await api(`/admin/tickets/${second.ticket.id}/revoke`, { body: {}, cookie: adminCookie })).status, 409)
-  const now = Date.now()
-  await env.DB.prepare('UPDATE purchase_requests SET reviewed_at = ? WHERE id = ?').bind(now - 31 * 86400 * 1000, purchase.id).run()
-  const cleanup = await worker.scheduled({ cron: '0 18 * * *', scheduledTime: new Date(now) })
-  assert.equal(cleanup.outcome, 'ok')
+
+  const rejectedId = randomUUID()
+  const rejectedPhotoKey = `verification/${rejectedId}.jpg`
+  await env.PRIVATE_FILES.put(rejectedPhotoKey, jpeg)
+  await env.DB.prepare(`INSERT INTO purchase_requests
+    (id, user_id, campaign_id, cafe_nickname, photo_key, status, submitted_at, reviewed_at, reviewed_by)
+    SELECT ?, user_id, campaign_id, '합성 반려', ?, 'rejected', submitted_at, reviewed_at, reviewed_by
+    FROM purchase_requests WHERE id = ?`).bind(rejectedId, rejectedPhotoKey, purchase.id).run()
+
+  const approvedPhotoExpiry = detail.purchase.reviewedAt + 7 * dayMs
+  await runPhotoCleanup(approvedPhotoExpiry - 1)
+  assert.equal((await api(adminRequest + '/photo', { cookie: adminCookie })).status, 200)
+  await runPhotoCleanup(approvedPhotoExpiry)
+  assert.equal(await env.PRIVATE_FILES.head(photoKey), null)
   assert.equal((await api(adminRequest + '/photo', { cookie: adminCookie })).status, 404)
+  const { purchase: afterCleanup } = await (await api(adminRequest, { cookie: adminCookie })).json()
+  assert.equal(afterCleanup.hasPhoto, false)
+  assert.equal(afterCleanup.status, 'approved')
+  assert.equal(afterCleanup.ticket.redeemedAt, reviewed.ticket.redeemedAt)
+  assert.equal((await (await api('/session', { cookie: memberCookie })).json()).access.bookVerified, true)
+  assert.ok(await env.PRIVATE_FILES.head(rejectedPhotoKey))
+  await runPhotoCleanup(detail.purchase.reviewedAt + 30 * dayMs)
+  assert.equal(await env.PRIVATE_FILES.head(rejectedPhotoKey), null)
   assert.ok(await env.DB.prepare("SELECT 1 FROM audit_events WHERE target_id = ? AND action = 'purchase_photo_purged'").bind(purchase.id).first())
+
+  const now = Date.now()
   await env.DB.prepare('UPDATE admin_mfa SET verified_at = ?').bind(now - 16 * 60 * 1000).run()
   assert.equal((await requestQueue(adminCookie)).status, 403)
   await env.DB.prepare('DELETE FROM member_roles WHERE user_id = ?').bind(session.user.id).run()

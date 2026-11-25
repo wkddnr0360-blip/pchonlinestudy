@@ -1,6 +1,6 @@
 import { Camera, Send } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
-import { purchaseStatusLabel, type PurchaseRequest } from '../../../shared/purchase'
+import { approvedPurchasePhotoRetentionDays, purchaseStatusLabel, type PurchaseRequest } from '../../../shared/purchase'
 
 async function encodePhoto(file: File) {
   if (!file.type.startsWith('image/') || file.size > 20 * 1024 * 1024) throw new Error('사진은 20MB 이하의 이미지로 선택해 주세요.')
@@ -73,6 +73,7 @@ export function PurchaseForm() {
     </div>}
     {canSubmit && <form onSubmit={submit} aria-busy={busy}>
       <p className="ons-field-hint">교재와 카페 닉네임을 손글씨로 적은 포스트잇이 한 사진에 보이게 촬영해 주세요.</p>
+      <p className="ons-field-hint">승인된 사진은 승인일로부터 {approvedPurchasePhotoRetentionDays}일이 지나면 자동으로 삭제합니다.</p>
       <label>카페 닉네임<input name="nickname" maxLength={60} defaultValue={purchase?.cafeNickname} required /></label>
       <label>교재 사진<input name="photo" type="file" accept="image/*" required onChange={(event) => {
         const file = event.target.files?.[0]
