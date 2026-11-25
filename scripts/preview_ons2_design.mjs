@@ -75,7 +75,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, origin)
     const path = url.pathname
     const mode = req.headers.cookie?.match(/(?:^|;\s*)ons-design=(admin|ticket|study|verified|login)(?:;|$)/)?.[1]
-    if (['/', '/account', '/admin', '/study', '/exam'].includes(path)) {
+    if (['/', '/account', '/admin', '/study', '/exam', '/terms', '/privacy'].includes(path)) {
       const preview = url.searchParams.get('preview')
       const learner = mode === 'verified' ? 'verified' : 'study'
       const next = path === '/admin' ? 'admin' : path === '/account' ? preview === 'ticket' ? 'ticket' : 'login'

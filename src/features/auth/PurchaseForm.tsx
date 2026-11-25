@@ -2,11 +2,13 @@ import { Camera, Send } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { approvedPurchasePhotoRetentionDays, purchaseStatusLabel, type PurchaseRequest } from '../../../shared/purchase'
 import { encodePurchasePhoto, purchasePhotoSourceMaxBytes } from './purchase-photo'
+import { AccountActionDialog } from './AccountActionDialog'
 
 export function PurchaseForm() {
   const [purchase, setPurchase] = useState<PurchaseRequest | null>()
   const [preview, setPreview] = useState<string>()
   const [error, setError] = useState('')
+  const [loadFailed, setLoadFailed] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -14,7 +16,7 @@ export function PurchaseForm() {
     fetch('/api/v1/purchase', { cache: 'no-store', signal: abort.signal }).then(async (response) => {
       if (!response.ok) throw new Error('Could not load purchase')
       setPurchase((await response.json()).purchase)
-    }).catch(() => { if (!abort.signal.aborted) setError('구매 인증 상태를 불러오지 못했습니다.') })
+    }).catch(() => { if (!abort.signal.aborted) setLoadFailed(true) })
     return () => abort.abort()
   }, [])
 
@@ -42,15 +44,16 @@ export function PurchaseForm() {
   }
 
   const canSubmit = purchase === null || purchase?.status === 'resubmit' || purchase?.status === 'rejected'
-  return <section className="ons-account-section ons-purchase" aria-labelledby="ons-purchase-heading">
-    <h2 id="ons-purchase-heading"><Camera size={18} aria-hidden="true" />교재 구매 인증</h2>
-    {error && <p className="ons-error" role="alert">{error}</p>}
+  const detail = purchase ? purchaseStatusLabel[purchase.status] : '교재 사진 · 신청 상태'
+  return <AccountActionDialog title="교재 구매 인증" description="교재 사진을 제출하고 신청 상태를 확인하세요."
+    detail={detail} icon={Camera} busy={busy} onClose={() => { setPreview(undefined); setError('') }}>
+    {(loadFailed || error) && <p className="ons-error" role="alert">{error || '구매 인증 상태를 불러오지 못했습니다.'}</p>}
     {purchase && <div className="ons-purchase-state" role="status">
       <strong>{purchaseStatusLabel[purchase.status]}</strong>
-      {purchase.status === 'approved' && <span>받은 티켓은 아래에서 사용할 수 있습니다.</span>}
+      {purchase.status === 'approved' && <span>받은 티켓은 내 계정의 ‘교재 인증 티켓’에서 사용할 수 있습니다.</span>}
       {purchase.reviewNote && <span>{purchase.reviewNote}</span>}
     </div>}
-    {canSubmit && <form onSubmit={submit} aria-busy={busy}>
+    {canSubmit && <form className="ons-purchase" onSubmit={submit} aria-busy={busy}>
       <p className="ons-field-hint">교재와 카페 닉네임을 손글씨로 적은 포스트잇이 한 사진에 보이게 촬영해 주세요.</p>
       <p className="ons-field-hint">승인된 사진은 승인일로부터 {approvedPurchasePhotoRetentionDays}일이 지나면 자동으로 삭제합니다.</p>
       <label>카페 닉네임<input name="nickname" maxLength={60} defaultValue={purchase?.cafeNickname} required /></label>
@@ -61,6 +64,6 @@ export function PurchaseForm() {
       {preview && <img className="ons-purchase-photo" src={preview} alt="제출할 교재 사진" />}
       <button type="submit" className="ons-button" disabled={busy}><Send size={16} aria-hidden="true" />{busy ? '제출 중' : '구매 인증 신청'}</button>
     </form>}
-    {purchase === undefined && !error && <p role="status">인증 상태를 확인하고 있습니다.</p>}
-  </section>
+    {purchase === undefined && !loadFailed && <p role="status">인증 상태를 확인하고 있습니다.</p>}
+  </AccountActionDialog>
 }

@@ -2,13 +2,12 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { ArrowRight, LockKeyhole, TicketCheck, X } from 'lucide-react'
 import { stages } from '../../app/stages'
 import { stageHref } from './navigation'
-import { StageArtwork } from './StageArtwork'
+import { StageMascot } from './StageMascot'
 
 type Level = typeof stages[number]
 
 function StageCover({ level, locked, count }: { level: Level; locked: boolean; count: number | undefined }) {
   return <>
-    <StageArtwork stage={level.number} className="ons-stage-card-art" />
     <div className="ons-stage-card-copy">
       <span className="ons-stage-no">{level.number}단계</span>
       <strong>{level.name}</strong>
@@ -30,7 +29,7 @@ function LockedStage({ level }: { level: Level }) {
       <Dialog.Overlay className="ons-stage-overlay" />
       <Dialog.Content className="ons-stage-dialog" data-stage={level.number}>
         <Dialog.Close asChild><button type="button" className="ons-icon-button ons-stage-dialog-close" aria-label="단계 안내 닫기"><X size={22} aria-hidden="true" /></button></Dialog.Close>
-        <StageArtwork stage={level.number} reaction className="ons-stage-dialog-art" />
+        <div className="ons-stage-dialog-art"><StageMascot stage={level.number} playOnMount /></div>
         <div className="ons-stage-dialog-copy">
           <Dialog.Title>{level.number}단계 {level.name}</Dialog.Title>
           <Dialog.Description>교재 구매를 인증하면 이 단계의 문제를 풀 수 있어요.</Dialog.Description>
@@ -44,11 +43,12 @@ function LockedStage({ level }: { level: Level }) {
 export function StageGallery({ verified, counts }: { verified: boolean; counts: Partial<Record<Level['number'], number>> }) {
   return <section className="ons-stage-gallery" id="levels" aria-labelledby="ons-stage-gallery-heading">
     <h2 id="ons-stage-gallery-heading">단계별 학습</h2>
-    <ul>{stages.map((level) => <li key={level.number}>
+    <ul>{stages.map((level) => <li className="ons-stage-tile" key={level.number}>
       {level.number > 1 && !verified ? <LockedStage level={level} />
         : <a className="ons-stage-card" data-stage={level.number} href={stageHref(level.number)} aria-label={`${level.number}단계 ${level.name}`}>
           <StageCover level={level} locked={false} count={counts[level.number]} />
         </a>}
+      <StageMascot stage={level.number} className="ons-stage-card-art" />
     </li>)}</ul>
   </section>
 }

@@ -5,6 +5,7 @@ import { decode, encode } from 'jpeg-js'
 import { createServer } from 'vite'
 import { createTestHarness } from 'wrangler'
 import { seedSyntheticBook } from './ons2-book-fixture.mjs'
+import { registrationTermsVersion } from '../shared/registration.ts'
 
 const origin = 'http://127.0.0.1:8787'
 const fixtureClient = 'synthetic-ons2.apps.googleusercontent.com'
@@ -25,6 +26,7 @@ const harness = createTestHarness({
 })
 const worker = harness.getWorker('pch-ons2-local')
 let env
+const confirmation = { ageConfirmed: true, termsAccepted: true, termsVersion: registrationTermsVersion }
 
 async function api(path, { body, cookie, sentOrigin = origin, ip = '192.0.2.11' } = {}) {
   const headers = new Headers({ 'CF-Connecting-IP': ip })
@@ -47,7 +49,7 @@ async function api(path, { body, cookie, sentOrigin = origin, ip = '192.0.2.11' 
 }
 
 async function signup(email, password) {
-  return api('/auth/sign-up/email', { body: { email, name: '합성 회원', password, callbackURL: origin + '/account' } })
+  return api('/auth/sign-up/email', { body: { email, name: '합성 회원', password, callbackURL: origin + '/account', ...confirmation } })
 }
 
 async function verifyEmail(email) {
@@ -218,11 +220,19 @@ test('Google OAuth begins with a new state and S256 challenge; wrong origins are
 })
 
 test('username registration is atomic and only its owner can withdraw with a recent session', async () => {
-  const body = { username: 'First.Learner', name: '합성 아이디 회원', password: 'Synthetic username password 26!' }
+  const password = 'Synthetic username password 26!'
+  const body = { username: 'First.Learner', name: '합성 아이디 회원', password, passwordConfirmation: password, ...confirmation }
   const register = (input, sentOrigin = origin) => api('/auth/sign-up/username', { body: input, sentOrigin })
-  const login = (input) => api('/auth/sign-in/username', { body: input })
+  const login = (input, ip) => api('/auth/sign-in/username', { body: input, ip })
   assert.equal((await register(body, 'https://other.example.test')).status, 403)
   assert.equal((await register({ ...body, username: 'bad@address' })).status, 400)
+  for (const missing of [{ ageConfirmed: 'true' }, { termsAccepted: false }, { termsVersion: 'older' }]) {
+    const blocked = await register({ ...body, ...missing })
+    assert.equal(blocked.status, 400)
+    assert.equal((await blocked.json()).error, 'signup_confirmation_required')
+  }
+  assert.equal((await (await register({ ...body, name: ' ' })).json()).error, 'nickname_required')
+  assert.equal((await (await register({ ...body, passwordConfirmation: 'different' })).json()).error, 'password_mismatch')
   const registrations = await Promise.all([register(body), register({ ...body, username: 'first.learner' })])
   assert.deepEqual(registrations.map((response) => response.status).sort(), [201, 409])
   assert.equal((await signup('first.learner@id.ons.invalid', body.password)).status, 400)
@@ -230,12 +240,32 @@ test('username registration is atomic and only its owner can withdraw with a rec
   const loggedIn = await login({ ...body, username: ' FIRST.LEARNER ' })
   assert.equal(loggedIn.status, 200, await loggedIn.clone().text())
   assert.deepEqual(await loggedIn.json(), { ok: true })
-  const cookie = cookieFrom(loggedIn, 'session_token')
-  const { user, admin } = await (await api('/session', { cookie })).json()
+  let cookie = cookieFrom(loggedIn, 'session_token')
+  const { user, admin, canChangePassword } = await (await api('/session', { cookie })).json()
   assert.deepEqual(user, { id: user.id, name: body.name, username: 'first.learner', email: null })
   assert.equal(admin, null)
+  assert.equal(canChangePassword, true)
+  const record = await env.DB.prepare('SELECT registrationTermsVersion, registrationConfirmedAt FROM user WHERE id = ?').bind(user.id).first()
+  assert.equal(record.registrationTermsVersion, registrationTermsVersion)
+  assert.ok(Number.isSafeInteger(record.registrationConfirmedAt) && record.registrationConfirmedAt > 0)
   assert.equal((await api('/study/questions/1', { cookie })).status, 200)
   assert.equal((await api('/admin/purchases', { cookie })).status, 403)
+  assert.equal((await api('/account/profile', { body: { name: '다른 요청' } })).status, 401)
+  assert.equal((await api('/account/profile', { cookie, body: { name: '교체' }, sentOrigin: 'https://other.example.test' })).status, 403)
+  const edited = await api('/account/profile', { cookie, body: { name: ' 새 합성 닉네임 ', userId: 'other-account' } })
+  assert.deepEqual(await edited.json(), { name: '새 합성 닉네임' })
+  assert.equal((await (await api('/session', { cookie })).json()).user.name, '새 합성 닉네임')
+  const newPassword = 'Changed synthetic browser password!'
+  const passwordChange = { currentPassword: password, newPassword, passwordConfirmation: newPassword }
+  assert.equal((await api('/account/password', { cookie, body: { ...passwordChange, currentPassword: 'Incorrect password' } })).status, 400)
+  const rotated = await api('/account/password', { cookie, body: passwordChange })
+  assert.equal(rotated.status, 200, await rotated.clone().text())
+  assert.deepEqual(await rotated.json(), { ok: true })
+  assert.equal((await api('/session', { cookie })).status, 401)
+  assert.equal((await login(body)).status, 401)
+  cookie = cookieFrom(rotated, 'session_token')
+  assert.equal((await api('/session', { cookie })).status, 200)
+  assert.equal((await login({ ...body, password: newPassword }, '192.0.2.12')).status, 200)
 
   const { code } = await issueFixtureTicket(user.id)
   assert.equal((await api('/book-access/redeem', { cookie, body: { code } })).status, 200)
@@ -252,18 +282,20 @@ test('username registration is atomic and only its owner can withdraw with a rec
       + (SELECT count(*) FROM entitlements WHERE user_id = ?) AS remaining
   `).bind(user.id, user.id, user.id).first()
   assert.equal(removed.remaining, 0)
-  assert.equal((await login(body)).status, 401)
+  assert.equal((await login({ ...body, password: newPassword }, '192.0.2.12')).status, 401)
 })
 
 test('Kakao OAuth creates one member without email and preserves membership across sign-ins', async (t) => {
   const body = { provider: 'kakao', callbackURL: origin + '/account', disableRedirect: true }
   assert.equal((await api('/auth/sign-in/social', { body, sentOrigin: 'https://untrusted.invalid' })).status, 403)
   assert.equal((await api('/auth/sign-in/social', { body: { ...body, scopes: ['account_email'] } })).status, 400)
+  assert.equal((await api('/auth/sign-in/social', { body: { ...body, requestSignUp: true } })).status, 400)
+  assert.equal((await api('/auth/sign-up/email', { body: { email: 'no-confirmation@example.test', name: '합성', password: 'Password test length' } })).status, 400)
   assert.equal((await signup('4212345678@kakao.ons.invalid', 'Synthetic no collision password!')).status, 400)
   const missingState = await api('/auth/callback/kakao?code=synthetic-auth-code')
   assert.match(missingState.headers.get('Location'), /\/account\?error=state_not_found$/)
 
-  const begin = await api('/auth/sign-in/social', { body })
+  const begin = await api('/auth/sign-in/social', { body: { ...body, requestSignUp: true, ...confirmation } })
   assert.equal(begin.status, 200, await begin.clone().text())
   const redirect = new URL((await begin.json()).url)
   assert.equal(redirect.origin, 'https://kauth.kakao.com')
@@ -305,6 +337,10 @@ test('Kakao OAuth creates one member without email and preserves membership acro
     return callback
   }
 
+  const implicit = await api('/auth/sign-in/social', { body })
+  const implicitState = new URL((await implicit.json()).url).searchParams.get('state')
+  assert.match((await finish(implicit, implicitState)).headers.get('Location'), /\/account\?error=signup_disabled$/)
+  assert.equal(await env.DB.prepare("SELECT 1 FROM account WHERE providerId = 'kakao'").first(), null)
   const completed = await finish(begin, state)
   assert.equal(completed.headers.get('Location'), origin + '/account')
   assert.equal(createHash('sha256').update(tokenRequest.get('code_verifier')).digest('base64url'), redirect.searchParams.get('code_challenge'))
@@ -316,8 +352,11 @@ test('Kakao OAuth creates one member without email and preserves membership acro
   const { user, admin } = await signedIn.json()
   assert.deepEqual(user, { id: user.id, name: '합성 카카오 회원', email: null })
   assert.equal(admin, null)
-  const stored = await env.DB.prepare('SELECT emailVerified FROM user WHERE id = ?').bind(user.id).first()
+  const stored = await env.DB.prepare('SELECT emailVerified, registrationTermsVersion, registrationConfirmedAt FROM user WHERE id = ?').bind(user.id).first()
   assert.equal(stored.emailVerified, 0)
+  assert.equal(stored.registrationTermsVersion, registrationTermsVersion)
+  assert.ok(stored.registrationConfirmedAt > 0)
+  assert.equal((await api('/account/password', { cookie, body: {} })).status, 403)
   assert.equal((await api('/study/questions/1', { cookie })).status, 200)
   assert.equal((await api('/study/questions/25', { cookie })).status, 404)
   const { code } = await issueFixtureTicket(user.id)
@@ -330,7 +369,8 @@ test('Kakao OAuth creates one member without email and preserves membership acro
   if (mailTable) assert.equal(await env.DB.prepare("SELECT 1 FROM local_mail_fixtures WHERE email = '4212345678@kakao.ons.invalid'").first(), null)
 
   profile = { id: profile.id, kakao_account: { email: 'unrequested@example.test', is_email_valid: true, is_email_verified: true } }
-  const second = await api('/auth/sign-in/social', { body })
+  const second = await api('/auth/sign-in/social', { body, ip: '192.0.2.12' })
+  assert.equal(second.status, 200, await second.clone().text())
   const nextState = new URL((await second.json()).url).searchParams.get('state')
   const signedInAgain = await api('/session', { cookie: cookieFrom(await finish(second, nextState), 'session_token') })
   const existing = await signedInAgain.json()

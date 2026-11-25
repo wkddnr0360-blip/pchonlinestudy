@@ -1,9 +1,10 @@
 import { betterAuth } from 'better-auth'
-import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { addOAuthServerContext, APIError, createAuthMiddleware, getOAuthState } from 'better-auth/api'
 import { twoFactor } from 'better-auth/plugins/two-factor'
 import type { AppEnv } from '../index'
 import { isKakaoAccountAddress, mapKakaoProfile } from './kakao'
 import { consumeAuthLimit } from './rate-limit'
+import { readSignupState, type RegistrationConfirmation } from './registration'
 import { isUsernameAccountAddress, usernameSignIn, usernameSignUp } from './username'
 
 export const authPath = '/api/v1/auth'
@@ -60,7 +61,12 @@ async function sendAccountEmail(env: AppEnv, settings: AuthSettings, kind: 'veri
   if (!response.ok) throw new Error('Could not send account email')
 }
 
-export function createAuth(env: AppEnv, settings: AuthSettings, options: { onLocalMail?: (url: string) => void; usernameLogin?: boolean } = {}) {
+export function createAuth(env: AppEnv, settings: AuthSettings, options: {
+  onLocalMail?: (url: string) => void
+  usernameLogin?: boolean
+  passwordChange?: boolean
+  registration?: RegistrationConfirmation
+} = {}) {
   return betterAuth({
     appName: '박철한 온스',
     database: env.DB,
@@ -74,17 +80,33 @@ export function createAuth(env: AppEnv, settings: AuthSettings, options: { onLoc
     session: { expiresIn: 60 * 60 * 24 * 7, cookieCache: { enabled: false } },
     verification: { storeIdentifier: 'hashed' },
     account: { accountLinking: { enabled: false }, encryptOAuthTokens: true },
+    user: {
+      additionalFields: {
+        registrationTermsVersion: { type: 'string', required: false, input: false, returned: false },
+        registrationConfirmedAt: { type: 'number', required: false, input: false, returned: false },
+      },
+    },
+    databaseHooks: {
+      user: { create: { before: async (user, context) => {
+        const accepted = context?.path === '/sign-up/email' ? options.registration
+          : readSignupState((await getOAuthState())?.serverContext?.registration)
+        if (!accepted || env.ONS_ENV === 'production') {
+          throw new APIError('BAD_REQUEST', { code: 'signup_confirmation_required', message: 'Sign-up confirmation is required' })
+        }
+        return { data: { ...user, ...accepted } }
+      } } },
+    },
     plugins: [twoFactor({ allowPasswordless: true })],
     socialProviders: {
       ...(settings.google ? {
         google: {
           clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET!,
-          disableIdTokenSignIn: true, includeGrantedScopes: false, prompt: 'select_account',
+          disableIdTokenSignIn: true, disableImplicitSignUp: true, includeGrantedScopes: false, prompt: 'select_account',
         },
       } : {}),
       ...(settings.kakao ? {
         kakao: {
-          ...settings.kakao, disableIdTokenSignIn: true, disableDefaultScope: true,
+          ...settings.kakao, disableIdTokenSignIn: true, disableImplicitSignUp: true, disableDefaultScope: true,
           scope: ['profile_nickname'], mapProfileToUser: mapKakaoProfile,
         },
       } : {}),
@@ -100,10 +122,13 @@ export function createAuth(env: AppEnv, settings: AuthSettings, options: { onLoc
         if (context.path === '/sign-in/social' && context.body?.provider === 'kakao' && context.body.scopes?.length) {
           throw new APIError('BAD_REQUEST', { message: 'Additional Kakao scopes are unavailable' })
         }
+        if (context.path === '/sign-in/social' && context.body?.requestSignUp === true && options.registration) {
+          await addOAuthServerContext({ registration: options.registration })
+        }
       }),
     },
     emailAndPassword: {
-      enabled: settings.email || Boolean(options.usernameLogin),
+      enabled: settings.email || Boolean(options.usernameLogin || options.passwordChange),
       autoSignIn: false,
       requireEmailVerification: !options.usernameLogin,
       minPasswordLength: 12,

@@ -1,13 +1,14 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { ChevronRight, LogOut, Settings, UserMinus } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 
 const confirmation = '회원탈퇴'
 
-export function AccountManagement({ busy, onSignOut, onWithdraw }: {
+export function AccountManagement({ busy, onSignOut, onWithdraw, children }: {
   busy: boolean
   onSignOut: () => void
   onWithdraw: (confirmation: string) => Promise<string | undefined>
+  children?: ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState('')
@@ -30,6 +31,7 @@ export function AccountManagement({ busy, onSignOut, onWithdraw }: {
 
   return <section className="ons-account-section ons-account-management" aria-labelledby="ons-management-heading">
     <h2 id="ons-management-heading"><Settings size={18} aria-hidden="true" />계정 관리</h2>
+    {children}
     <button type="button" className="ons-account-action" disabled={busy} onClick={onSignOut}>
       <LogOut size={17} aria-hidden="true" />로그아웃<ChevronRight size={16} aria-hidden="true" />
     </button>

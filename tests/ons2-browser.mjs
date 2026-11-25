@@ -5,6 +5,7 @@ import { createServer } from 'node:http'
 import { after, before, beforeEach, test } from 'node:test'
 import { chromium, devices, expect, webkit } from '@playwright/test'
 import { createTestHarness } from 'wrangler'
+import { registrationTermsVersion } from '../shared/registration.ts'
 import { seedSyntheticBook } from './ons2-book-fixture.mjs'
 
 const workerConfig = {
@@ -69,7 +70,33 @@ test('the mobile social login shows Kakao and Google and starts Kakao without em
   }
 })
 
-test('mobile username signup, account sections and withdrawal work without email', async () => {
+async function confirmSignup(page) {
+  await page.getByRole('checkbox', { name: /만 14세 이상/ }).check()
+  await page.getByRole('checkbox', { name: /이용약관에 동의/ }).check()
+}
+
+test('new social accounts see signup confirmation and the linked terms draft', async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  try {
+    await page.route('https://accounts.google.com/**', (route) => route.fulfill({ body: 'Synthetic Google sign-in' }))
+    await page.goto(baseURL + '/account?study=2&error=signup_disabled')
+    await expect(page.getByRole('heading', { name: '간편 회원가입' })).toBeVisible()
+    await page.getByRole('button', { name: 'Google로 가입' }).click()
+    assert.ok(page.url().startsWith(baseURL))
+    const [terms] = await Promise.all([
+      page.context().waitForEvent('page'),
+      page.getByRole('link', { name: '이용약관 보기' }).click(),
+    ])
+    await expect(terms.getByRole('heading', { name: '온스 서비스 이용약관' })).toBeVisible()
+    await expect(terms.getByText(/스테이징 검토용 초안/)).toBeVisible()
+    await terms.close()
+    await confirmSignup(page)
+    await page.getByRole('button', { name: 'Google로 가입' }).click()
+    await page.waitForURL('https://accounts.google.com/**')
+  } finally { await page.close() }
+})
+
+test('mobile username signup, compact account, member settings and withdrawal', async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
   try {
     await page.route('**/api/v1/auth-methods', (route) => route.fulfill({ json: { kakao: true, google: true, email: false, username: true } }))
@@ -78,6 +105,14 @@ test('mobile username signup, account sections and withdrawal work without email
     await page.getByRole('button', { name: '아이디로 회원가입' }).click()
     await page.locator('input[name="username"]').fill('ons-browser-member')
     await page.locator('input[name="password"]').fill('A synthetic browser test password!')
+    await page.getByLabel('비밀번호 확인', { exact: true }).fill('A synthetic browser test password!')
+    await page.getByLabel('닉네임', { exact: true }).fill('합성 아이디 회원')
+    await page.getByRole('button', { name: '아이디로 가입', exact: true }).click()
+    assert.equal(await page.getByRole('checkbox', { name: /만 14세 이상/ }).evaluate((input) => input.validity.valueMissing), true)
+    const privacy = await page.request.get(baseURL + '/privacy')
+    assert.equal(privacy.status(), 200)
+    await confirmSignup(page)
+    await page.screenshot({ path: '.ons2/qa/username-signup-390.png', fullPage: true, animations: 'disabled' })
     await page.getByRole('button', { name: '아이디로 가입', exact: true }).click()
     await expect(page.getByText('가입했습니다. 새 아이디로 로그인해 주세요.')).toBeVisible()
     await page.locator('input[name="username"]').fill('ONS-BROWSER-MEMBER')
@@ -85,10 +120,28 @@ test('mobile username signup, account sections and withdrawal work without email
     await page.getByRole('button', { name: '아이디로 로그인', exact: true }).click()
     await expect(page.getByRole('heading', { name: '내 계정' })).toBeVisible()
     await expect(page.getByRole('region', { name: '이용 상태' })).toBeVisible()
-    await expect(page.getByRole('region', { name: '교재 구매 인증' })).toBeVisible()
-    await expect(page.getByRole('form', { name: '교재 인증 티켓' })).toBeVisible()
+    const purchase = page.getByRole('button', { name: '교재 구매 인증', exact: true })
+    await expect(purchase).toBeVisible()
+    await expect(page.getByRole('button', { name: '교재 인증 티켓', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: '카페 닉네임' })).toHaveCount(0)
+    await expect(page.getByRole('textbox', { name: '티켓 코드' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: '계정 관리' })).toBeVisible()
+    assert.equal(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight), true)
     await page.screenshot({ path: '.ons2/qa/account-sections-390.png', fullPage: true, animations: 'disabled' })
+    await purchase.click()
+    await expect(page.getByRole('dialog', { name: '교재 구매 인증' }).getByLabel('카페 닉네임')).toBeVisible()
+    await page.screenshot({ path: '.ons2/qa/purchase-sheet-390.png', animations: 'disabled' })
+    await page.keyboard.press('Escape')
+    await expect(purchase).toBeFocused()
+    await page.getByRole('button', { name: '회원 정보 수정' }).click()
+    const profile = page.getByRole('dialog', { name: '회원 정보 수정' })
+    await profile.getByLabel('닉네임').fill('수정한 학습자')
+    await profile.getByRole('button', { name: '닉네임 저장' }).click()
+    await expect(profile.getByRole('status')).toHaveText('닉네임을 저장했습니다.')
+    await profile.getByText('비밀번호 변경', { exact: true }).click()
+    await expect(profile.getByLabel('현재 비밀번호')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('region', { name: '이용 상태' })).toContainText('수정한 학습자')
     await page.getByRole('button', { name: '회원탈퇴', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '회원탈퇴' })
     await expect(dialog.getByRole('button', { name: '탈퇴 확정' })).toBeDisabled()
@@ -112,6 +165,7 @@ test('a mobile learner signs up, solves an OX question and opens the verified ex
     await page.getByRole('textbox', { name: '표시 이름' }).fill('합성 학습 회원')
     await page.getByRole('textbox', { name: '이메일' }).fill(email)
     await page.getByLabel('비밀번호', { exact: true }).fill(password)
+    await confirmSignup(page)
     await page.getByRole('button', { name: '회원가입', exact: true }).click()
     await page.getByRole('link', { name: '테스트 메일 링크 열기' }).click()
     await page.getByRole('heading', { name: '로그인', exact: true }).waitFor()
@@ -175,6 +229,8 @@ test('a mobile learner signs up, solves an OX question and opens the verified ex
     ])
     assert.equal((await page.request.post(baseURL + '/api/v1/book-access/redeem', { data: { code }, headers })).status(), 200)
     await page.goto(baseURL)
+    await expect(page.getByRole('progressbar', { name: '전체 학습 진도' })).toHaveAttribute('value', '1')
+    await expect(page.getByRole('link', { name: '최근 학습' })).toHaveAttribute('href', '/study?stage=1')
     await expect(page.getByRole('link', { name: /3단계 고득점 도전/ })).toBeVisible()
     await page.getByRole('link', { name: /실전 모의고사/ }).click()
     await expect(page.getByLabel('제한 시간 (분)')).toHaveValue('20')
@@ -209,13 +265,20 @@ for (const width of [320, 390, 701, 768, 1080, 1280]) {
         const description = document.createRange()
         description.selectNodeContents(card.querySelector('.ons-stage-card-description'))
         const textRight = Math.max(...Array.from(description.getClientRects(), (line) => line.right))
-        return card.querySelector('.ons-stage-scene').getBoundingClientRect().left - textRight
+        return card.closest('.ons-stage-tile').querySelector('.ons-stage-scene').getBoundingClientRect().left - textRight
       }))
       assert.ok(descriptionGaps.every((gap) => gap >= 8), `Description to artwork gaps: ${descriptionGaps.join(', ')}`)
       if ([390, 1080, 1280].includes(width)) {
         await page.screenshot({ path: `.ons2/qa/home-${width}.png`, animations: 'disabled', fullPage: width === 1280 })
       }
       if (width === 390) {
+        const levels = page.getByRole('region', { name: '단계별 학습' })
+        for (const name of ['1단계 철한쌤 웃음 모션', '2단계 철한쌤 활짝 웃는 응원 모션', '3단계 철한쌤 불꽃 응원 모션']) {
+          const mascot = levels.getByRole('button', { name, exact: true })
+          await mascot.click()
+          await expect(mascot.locator('.ons-stage-teacher')).toHaveAttribute('data-reaction', 'true')
+          assert.equal(await page.getByRole('dialog').count(), 0)
+        }
         const locked = page.getByRole('button', { name: /2단계 실전 감각/ })
         await locked.focus()
         await page.keyboard.press('Enter')
@@ -260,6 +323,7 @@ for (const width of [320, 390, 701, 768, 1080, 1280]) {
       await page.getByRole('textbox', { name: '표시 이름' }).fill('합성 브라우저 회원')
       await page.getByRole('textbox', { name: '이메일' }).fill(`browser${width}@example.test`)
       await page.getByLabel('비밀번호', { exact: true }).fill('Synthetic browser password!')
+      await confirmSignup(page)
       await page.getByRole('button', { name: '회원가입', exact: true }).click()
       await page.getByRole('status').filter({ hasText: '인증 링크' }).waitFor()
     } finally {
@@ -277,7 +341,8 @@ for (const engine of [chromium, webkit]) {
       const password = 'Synthetic photo upload password!'
       const headers = { Origin: baseURL }
       const created = await page.request.post(baseURL + '/api/v1/auth/sign-up/email', {
-        headers, data: { email, password, name: '합성 사진 회원', callbackURL: baseURL + '/account' },
+        headers, data: { email, password, name: '합성 사진 회원', callbackURL: baseURL + '/account',
+          ageConfirmed: true, termsAccepted: true, termsVersion: registrationTermsVersion },
       })
       assert.equal(created.status(), 200)
       const { DB } = await harness.getWorker().getEnv()
@@ -287,6 +352,7 @@ for (const engine of [chromium, webkit]) {
       assert.equal(signedIn.status(), 200)
 
       await page.goto(baseURL + '/account')
+      await page.getByRole('button', { name: '교재 구매 인증', exact: true }).click()
       const image = await page.evaluate(() => {
         const canvas = document.createElement('canvas')
         canvas.width = 1800
@@ -356,6 +422,7 @@ for (const reducedMotion of ['no-preference', 'reduce']) {
         access: { bookVerified: true, expiresAt: Date.parse('2027-03-14T15:00:00Z') }, consumedNow: true,
       } }))
       await page.goto(baseURL + '/account')
+      await page.getByRole('button', { name: '교재 인증 티켓', exact: true }).click()
       const code = page.getByRole('textbox', { name: '티켓 코드' })
       await code.fill('ABCD1234-ABCD1234-ABCD1234-ABCD1234')
       const initial = await page.locator('.ons-ticket-art').evaluate((canvas) => canvas.toDataURL())

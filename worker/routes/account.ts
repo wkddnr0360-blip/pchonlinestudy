@@ -2,6 +2,8 @@ import type { AppEnv } from '../index'
 import { getAdminAccess, recordAdminMfa } from '../auth/admin'
 import { authPath, authRoute, authSettings, createAuth, enableMfaPath, verifyMfaPath } from '../auth/config'
 import { isKakaoAccountAddress } from '../auth/kakao'
+import { acceptSignup, type RegistrationConfirmation } from '../auth/registration'
+import { changeProfile, withPasswordChange } from '../auth/profile'
 import { isUsernameAccountAddress, readUsernameCredentials, registerUsername, usernameSignIn, usernameSignUp } from '../auth/username'
 import { withdrawMember } from '../auth/withdraw'
 import { json, privateHeaders, readSmallJson } from '../http'
@@ -14,6 +16,8 @@ import { examPrefix, examRoute } from './exams'
 const sessionPath = '/api/v1/session'
 const redeemPath = '/api/v1/book-access/redeem'
 const withdrawPath = '/api/v1/account/withdraw'
+const profilePath = '/api/v1/account/profile'
+const passwordPath = '/api/v1/account/password'
 
 export async function accountRoutes(request: Request, env: AppEnv, url: URL): Promise<Response | undefined> {
   const { method } = request
@@ -27,12 +31,15 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
   const purchaseRoute = path === purchasePath
   const study = path.startsWith(studyPrefix)
   const exam = path.startsWith(examPrefix)
-  if (!libraryRoute && !adminRoute && !purchaseRoute && !study && !exam && path !== sessionPath && path !== redeemPath && path !== withdrawPath) return undefined
+  const isAccountAction = [sessionPath, redeemPath, withdrawPath, profilePath, passwordPath].includes(path)
+  if (!libraryRoute && !adminRoute && !purchaseRoute && !study && !exam && !isAccountAction) return undefined
 
   const readSession = path === sessionPath && ['GET', 'HEAD'].includes(method)
   const redeem = path === redeemPath && method === 'POST'
   const withdraw = path === withdrawPath && method === 'POST'
-  if (!libraryRoute && !adminRoute && !purchaseRoute && !study && !exam && !readSession && !redeem && !withdraw) return json({ error: 'not_found' }, 404, method)
+  const profile = path === profilePath && method === 'POST'
+  const passwordChange = path === passwordPath && method === 'POST'
+  if (!libraryRoute && !adminRoute && !purchaseRoute && !study && !exam && !readSession && !redeem && !withdraw && !profile && !passwordChange) return json({ error: 'not_found' }, 404, method)
   if (!settings) return readSession || study || exam ? json({ error: 'login_required' }, 401, method) : json({ error: 'service_unavailable' }, 503, method)
   if (url.origin !== settings.origin || (method === 'POST' && request.headers.get('Origin') !== settings.origin)) {
     return json({ error: 'forbidden_origin' }, 403, method)
@@ -42,12 +49,28 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
     if (libraryRoute && !authRoute(settings, method, path)) return json({ error: 'not_found' }, 404, method)
     if (path === authPath + usernameSignUp) return await registerUsername(request, env)
     const usernameLogin = path === authPath + usernameSignIn
+    let registration: RegistrationConfirmation | undefined
+    let checkedAuthRequest = request
+    const emailSignup = path === authPath + '/sign-up/email'
+    if (emailSignup || path === authPath + '/sign-in/social') {
+      const input = await readSmallJson(request, 8192)
+      if (!input || typeof input !== 'object' || Array.isArray(input)) return json({ error: 'invalid_input' }, 400)
+      const data = input as Record<string, unknown>
+      if (emailSignup || data.requestSignUp === true) {
+        const accepted = acceptSignup(env, data)
+        if (!accepted) return json({ error: 'signup_confirmation_required' }, 400)
+        registration = accepted
+      }
+      const headers = new Headers(request.headers)
+      headers.delete('Content-Length')
+      checkedAuthRequest = new Request(request.url, { method, headers, body: JSON.stringify(data) })
+    }
     let localMailLink: string | undefined
     const auth = createAuth(env, settings, {
-      usernameLogin, onLocalMail: settings.testMail ? (link) => { localMailLink = link } : undefined,
+      usernameLogin, passwordChange, registration, onLocalMail: settings.testMail ? (link) => { localMailLink = link } : undefined,
     })
     if (libraryRoute) {
-      let authRequest = request
+      let authRequest = checkedAuthRequest
       if (usernameLogin) {
         const credentials = await readUsernameCredentials(request)
         if (!credentials) return json({ error: 'invalid_input' }, 400)
@@ -121,13 +144,22 @@ export async function accountRoutes(request: Request, env: AppEnv, url: URL): Pr
     const suspended = await env.DB.prepare('SELECT 1 FROM member_controls WHERE user_id = ? AND suspended_at IS NOT NULL')
       .bind(id).first()
     if (suspended) return json({ error: 'account_suspended' }, 403, method)
+    if (profile) return await changeProfile(request, env, id)
+    const canChangePassword = (readSession || passwordChange) && !kakaoMember
+      && Boolean(await env.DB.prepare("SELECT 1 FROM account WHERE userId = ? AND providerId = 'credential' AND password IS NOT NULL").bind(id).first())
+    if (passwordChange) {
+      if (!canChangePassword) return json({ error: 'credential_required' }, 403)
+      return await withPasswordChange(request, env, id, (currentPassword, newPassword) => auth.api.changePassword({
+        headers: request.headers, body: { currentPassword, newPassword, revokeOtherSessions: true }, asResponse: true,
+      }))
+    }
     if (study) return await studyRoute(request, env, url, id)
     if (exam) return await examRoute(request, env.DB, url, id)
 
     const admin = !accountProvider && (readSession || adminRoute)
       ? await getAdminAccess(env.DB, id, session.session.id, Boolean(session.user.twoFactorEnabled))
       : null
-    if (readSession) return json({ user: { id, email: accountProvider ? null : email, name, ...(username ? { username } : {}) }, access: await readMemberAccess(env.DB, id, Date.now()), admin }, 200, method)
+    if (readSession) return json({ user: { id, email: accountProvider ? null : email, name, ...(username ? { username } : {}) }, access: await readMemberAccess(env.DB, id, Date.now()), admin, canChangePassword }, 200, method)
     if (adminRoute) {
       if (!admin) return json({ error: 'forbidden' }, 403, method)
       if (!admin.mfaFresh) return json({ error: 'mfa_required' }, 403, method)

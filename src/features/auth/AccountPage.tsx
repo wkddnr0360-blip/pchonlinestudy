@@ -1,10 +1,13 @@
-import { ArrowLeft, ArrowRight, BadgeCheck, Eye, EyeOff, KeyRound, LockKeyhole, LogIn, Mail, MailCheck, ShieldCheck, Ticket, UserRound, UserRoundPlus } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BadgeCheck, Eye, EyeOff, KeyRound, LockKeyhole, LogIn, Mail, MailCheck, ShieldCheck, UserRound, UserRoundPlus } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AccountArtwork } from './AccountArtwork'
 import { TicketArt } from './TicketArt'
 import { PurchaseForm } from './PurchaseForm'
+import { TicketRegistration } from './TicketRegistration'
+import { ProfileSettings } from './ProfileSettings'
 import { AccountManagement } from './AccountManagement'
 import { UsernameForm } from './UsernameForm'
+import { RegistrationFields, registrationFields } from './RegistrationFields'
 import { studyReturnFromQuery } from '../study/navigation'
 import googleMark from './google-g.png'
 import kakaoButton from './kakao-login.png'
@@ -16,6 +19,7 @@ type Account = {
   user: { id: string; email: string | null; name: string; username?: string }
   access: { bookVerified: boolean; expiresAt: number | null }
   admin?: { mfaEnabled: boolean; mfaFresh: boolean } | null
+  canChangePassword?: boolean
 }
 
 const headings: Record<Mode, string> = {
@@ -62,6 +66,7 @@ export function AccountPage() {
   const [resetToken] = useState(() => new URLSearchParams(location.search).get('token'))
   const [mode, setMode] = useState<Mode>(resetToken ? 'reset' : 'signin')
   const [usernameForm, setUsernameForm] = useState<'signin' | 'signup' | null>(null)
+  const [socialSignup, setSocialSignup] = useState(false)
   const [methods, setMethods] = useState<Methods | null>(null)
   const [account, setAccount] = useState<Account | null>(null)
   const [notice, setNotice] = useState('')
@@ -74,9 +79,16 @@ export function AccountPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    const authFailed = new URLSearchParams(location.search).has('error')
-    if (resetToken || authFailed) history.replaceState(null, '', '/account')
-    if (authFailed) setError('인증 링크 또는 로그인 상태를 확인해 주세요.')
+    const params = new URLSearchParams(location.search)
+    const authError = params.get('error')
+    if (resetToken || authError !== null) {
+      const study = params.get('study')
+      history.replaceState(null, '', '/account' + (study ? '?' + new URLSearchParams({ study }).toString() : ''))
+    }
+    if (authError === 'signup_disabled' || authError === 'signup_confirmation_required') {
+      setSocialSignup(true)
+      setNotice('온스에 처음 오셨다면 가입 확인을 마친 뒤 간편 로그인을 선택해 주세요.')
+    } else if (authError !== null) setError('인증 링크 또는 로그인 상태를 확인해 주세요.')
     Promise.all([
       getAccount(controller.signal),
       fetch('/api/v1/auth-methods', { cache: 'no-store', signal: controller.signal }).then((response) => {
@@ -96,6 +108,7 @@ export function AccountPage() {
   function changeMode(next: Mode) {
     setMode(next)
     setUsernameForm(null)
+    setSocialSignup(false)
     setNotice('')
     setLocalMailLink(undefined)
     setError('')
@@ -129,7 +142,7 @@ export function AccountPage() {
     const password = form.get('password')
     const callbackURL = accountCallback
     const args = {
-      signin: { email, password }, signup: { email, password, name: form.get('name'), callbackURL },
+      signin: { email, password }, signup: { email, password, name: form.get('name'), callbackURL, ...registrationFields(form) },
       verify: { email, callbackURL }, forgot: { email, redirectTo: location.origin + '/account' }, reset: { token: resetToken, newPassword: password },
     }
 
@@ -167,33 +180,39 @@ export function AccountPage() {
     })
   }
 
-  function submitCode(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const code = new FormData(event.currentTarget).get('code')
-    void run(async () => {
-      const result = await post('/book-access/redeem', { code })
-      if (result.status === 409) {
-        setError('사용 가능한 코드를 확인해 주세요.')
-        return
-      }
-      if (!result.ok) throw new Error('Code redemption failed')
-      const redeemed = await result.json() as { access: Account['access']; consumedNow: boolean }
-      setAccount((current) => current ? { ...current, access: redeemed.access } : current)
-      setTicketConsumed(redeemed.consumedNow)
-      if (!redeemed.consumedNow) setNotice('교재 이용권을 등록했습니다.')
-    })
+  async function redeemCode(code: string) {
+    const result = await post('/book-access/redeem', { code })
+    if (result.status === 409) return '사용 가능한 코드를 확인해 주세요.'
+    if (!result.ok) throw new Error('Code redemption failed')
+    const redeemed = await result.json() as { access: Account['access']; consumedNow: boolean }
+    setAccount((current) => current ? { ...current, access: redeemed.access } : current)
+    setTicketConsumed(redeemed.consumedNow)
+    if (!redeemed.consumedNow) setNotice('교재 이용권을 등록했습니다.')
+    requestAnimationFrame(() => heading.current?.focus())
   }
 
   function submitUsername(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     const signup = usernameForm === 'signup'
+    const passwordConfirmation = form.get('passwordConfirmation')
+    if (signup && form.get('password') !== passwordConfirmation) {
+      setError('비밀번호 확인이 일치하는지 확인해 주세요.')
+      event.currentTarget.querySelector<HTMLInputElement>('[name="passwordConfirmation"]')?.focus()
+      return
+    }
     void run(async () => {
       const result = await post(signup ? '/auth/sign-up/username' : '/auth/sign-in/username', {
-        username: form.get('username'), password: form.get('password'), name: form.get('name'),
+        username: form.get('username'), password: form.get('password'),
+        ...(signup ? { name: form.get('name'), passwordConfirmation, ...registrationFields(form) } : {}),
       })
       if (result.status === 429) return setError('요청이 많습니다. 잠시 기다렸다 다시 시도해 주세요.')
       if (result.status === 409) return setError('이미 사용 중인 아이디입니다.')
+      if (signup && result.status === 400) {
+        const { error: issue } = await result.json()
+        if (issue === 'signup_confirmation_required') return setError('만 14세 이상 확인과 이용약관 동의를 확인해 주세요.')
+        if (issue === 'nickname_required') return setError('닉네임을 입력해 주세요.')
+      }
       if (!result.ok) return setError(signup ? '아이디와 비밀번호 길이를 확인해 주세요.' : '아이디와 비밀번호를 확인해 주세요.')
       if (signup) {
         changeUsernameForm('signin')
@@ -218,11 +237,13 @@ export function AccountPage() {
     setNotice('회원탈퇴를 완료했습니다.')
   }
 
-  function socialSignIn(provider: keyof typeof socialOrigins) {
+  function socialSignIn(provider: keyof typeof socialOrigins, registration?: FormData) {
     void run(async () => {
       const result = await post('/auth/sign-in/social', {
-        provider, callbackURL: accountCallback, disableRedirect: true,
+        provider, callbackURL: accountCallback, errorCallbackURL: accountCallback, disableRedirect: true,
+        ...(registration ? { requestSignUp: true, ...registrationFields(registration) } : {}),
       })
+      if (registration && result.status === 400) return setError('만 14세 이상 확인과 이용약관 동의를 확인해 주세요.')
       if (!result.ok) throw new Error('Social sign-in unavailable')
       const target = new URL((await result.json()).url)
       if (target.origin !== socialOrigins[provider]) throw new Error('Invalid sign-in URL')
@@ -233,15 +254,26 @@ export function AccountPage() {
   const showAccount = account && mode !== 'reset'
   const showGoogle = methods?.google && mode === 'signin' && !usernameForm
   const showKakao = methods?.kakao && mode === 'signin' && !usernameForm
-  const showUsername = methods?.username && mode === 'signin' && !usernameForm
-  const compact = !showAccount && showKakao && methods?.email
+  const showUsername = methods?.username && mode === 'signin' && !usernameForm && !socialSignup
+  const compact = !showAccount && (socialSignup || usernameForm === 'signup' || mode === 'signup' || (showKakao && methods?.email))
   const passwordField = mode === 'signin' || mode === 'signup' || mode === 'reset'
   const teacherStage = showAccount && account.access.bookVerified ? 3 : !showAccount && mode === 'signin' ? 1 : 2
-  const HeadingIcon = showAccount ? UserRound : headingIcons[usernameForm ?? mode]
-  const accountHeading = showAccount ? '내 계정' : usernameForm ? (usernameForm === 'signup' ? '아이디로 회원가입' : '아이디로 로그인') : headings[mode]
+  const HeadingIcon = showAccount ? UserRound : headingIcons[socialSignup ? 'signup' : usernameForm ?? mode]
+  const accountHeading = showAccount ? '내 계정' : socialSignup ? '간편 회원가입'
+    : usernameForm ? (usernameForm === 'signup' ? '아이디로 회원가입' : '아이디로 로그인') : headings[mode]
+  const socialButtons = <>
+    {showGoogle && <button type={socialSignup ? 'submit' : 'button'} value="google" className="ons-google-button" disabled={busy}
+      onClick={socialSignup ? undefined : () => socialSignIn('google')}>
+      <img src={googleMark} width="20" height="20" alt="" />{socialSignup ? 'Google로 가입' : 'Google로 로그인'}
+    </button>}
+    {showKakao && <button type={socialSignup ? 'submit' : 'button'} value="kakao" className="ons-kakao-button" disabled={busy}
+      aria-label={socialSignup ? '카카오로 가입' : undefined} onClick={socialSignup ? undefined : () => socialSignIn('kakao')}>
+      <img src={kakaoButton} width="224" height="46" alt="카카오 로그인" />
+    </button>}
+  </>
   return (
-    <main className={compact ? 'ons-account ons-account-compact' : 'ons-account'}>
-      <AccountArtwork stage={teacherStage} />
+    <main className={showAccount ? 'ons-account ons-account-signed-in' : compact ? 'ons-account ons-account-compact' : 'ons-account'}>
+      {!showAccount && <AccountArtwork stage={teacherStage} />}
       <section className="ons-account-content" aria-labelledby="ons-account-heading">
         <div className="ons-account-form">
           <h1 id="ons-account-heading" tabIndex={-1} ref={heading}>
@@ -255,31 +287,26 @@ export function AccountPage() {
           {showAccount ? (
             <div className="ons-identity-panel" aria-busy={busy}>
               <section className="ons-account-section ons-identity" aria-labelledby="ons-membership-heading">
-                <h2 id="ons-membership-heading"><UserRound size={18} aria-hidden="true" />이용 상태</h2>
+                <h2 id="ons-membership-heading" className="ons-visually-hidden">이용 상태</h2>
+                <AccountArtwork stage={teacherStage} />
                 <strong>{account.user.name}</strong>
                 {account.user.username
                   ? account.user.username !== account.user.name && <span>{account.user.username}</span>
                   : <span>{account.user.email ?? '카카오 로그인으로 가입'}</span>}
                 <p className="ons-member-label">{account.access.bookVerified ? <BadgeCheck size={17} aria-hidden="true" /> : <UserRound size={17} aria-hidden="true" />}
-                  {account.access.bookVerified && account.access.expiresAt !== null
-                    ? `교재 인증 이용권 · ${expiryDate.format(account.access.expiresAt - 1)}까지`
+                  {account.access.bookVerified
+                    ? account.access.expiresAt === null ? '교재 인증 회원' : `교재 인증 이용권 · ${expiryDate.format(account.access.expiresAt - 1)}까지`
                     : '무료 회원 · 교재 인증 전'}</p>
               </section>
               {ticketConsumed && <div className="ons-ticket ons-ticket-used" role="status">
                 <TicketArt animate />
                 <div><strong>황금 티켓 사용 완료</strong><span>정회원 이용권이 열렸어요.</span></div>
               </div>}
-              {!account.access.bookVerified && <PurchaseForm />}
-              {!account.access.bookVerified && (
-                <form onSubmit={submitCode} className="ons-account-section ons-ticket-form" aria-label="교재 인증 티켓">
-                  <div className="ons-ticket">
-                    <TicketArt />
-                    <div><strong>교재 인증 티켓</strong><span>내 계정에 발급된 티켓을 등록하세요.</span></div>
-                  </div>
-                  <label>티켓 코드<span className="ons-field-with-icon"><Ticket size={17} aria-hidden="true" /><input name="code" maxLength={80} required autoComplete="off" spellCheck={false} /></span></label>
-                  <button type="submit" className="ons-button" disabled={busy}><Ticket size={17} aria-hidden="true" />티켓 사용</button>
-                </form>
-              )}
+              {!account.access.bookVerified && <section className="ons-account-section ons-account-book" aria-labelledby="ons-account-book-heading">
+                <h2 id="ons-account-book-heading">교재 인증</h2>
+                <PurchaseForm />
+                <TicketRegistration onRedeem={redeemCode} />
+              </section>}
               {studyTarget && (account.access.bookVerified || ['1', 'review'].includes(studyTarget.key)) &&
                 <a href={studyTarget.href} className="ons-account-continue">학습으로 돌아가기<ArrowRight size={17} aria-hidden="true" /></a>}
               {account.admin && <a href="/admin" className="ons-admin-link"><ShieldCheck size={17} aria-hidden="true" />관리자 페이지</a>}
@@ -289,23 +316,27 @@ export function AccountPage() {
                 setTicketConsumed(false)
                 changeMode('signin')
                 setNotice('로그아웃했습니다.')
-              })} />
+              })}>
+                <ProfileSettings name={account.user.name} canChangePassword={account.canChangePassword} request={post}
+                  onNameChange={(name) => setAccount((current) => current ? { ...current, user: { ...current.user, name } } : current)} />
+              </AccountManagement>
             </div>
           ) : methods ? (
             <div className="ons-account-methods" aria-busy={busy}>
-              {showGoogle && (
-                <button type="button" className="ons-google-button" disabled={busy} onClick={() => socialSignIn('google')}>
-                  <img src={googleMark} width="20" height="20" alt="" />Google로 로그인
-                </button>
-              )}
-              {showKakao && (
-                <button type="button" className="ons-kakao-button" disabled={busy} onClick={() => socialSignIn('kakao')}>
-                  <img src={kakaoButton} width="224" height="46" alt="카카오 로그인" />
-                </button>
-              )}
+              {socialSignup ? <>
+                <form onSubmit={(event) => {
+                  event.preventDefault()
+                  const provider = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value')
+                  if (provider === 'google' || provider === 'kakao') socialSignIn(provider, new FormData(event.currentTarget))
+                }}>
+                  <RegistrationFields />
+                  {socialButtons}
+                </form>
+                <button type="button" className="ons-text-button" disabled={busy} onClick={() => changeMode('signin')}>로그인으로 돌아가기</button>
+              </> : socialButtons}
               {usernameForm && <UsernameForm mode={usernameForm} busy={busy} onSubmit={submitUsername} onChange={changeUsernameForm} onBack={() => changeMode('signin')} />}
-              {(showKakao || showGoogle) && methods.email && <p className="ons-account-divider">또는 이메일로</p>}
-              {methods.email && !usernameForm && <>
+              {(showKakao || showGoogle) && methods.email && !socialSignup && <p className="ons-account-divider">또는 이메일로</p>}
+              {methods.email && !usernameForm && !socialSignup && <>
                 <form key={mode} onSubmit={submitAuth}>
                   {mode === 'signup' && <label>표시 이름<span className="ons-field-with-icon"><UserRound size={17} aria-hidden="true" /><input name="name" autoComplete="nickname" maxLength={60} required /></span></label>}
                   {mode !== 'reset' && <label>이메일<span className="ons-field-with-icon"><Mail size={17} aria-hidden="true" /><input name="email" type="email" autoComplete="email" maxLength={254} autoCapitalize="none" spellCheck={false} required /></span></label>}
@@ -329,6 +360,7 @@ export function AccountPage() {
                       ) : <p id="ons-password-hint" className="ons-field-hint">12자 이상으로 입력해 주세요.</p>}
                     </div>
                   )}
+                  {mode === 'signup' && <RegistrationFields />}
                   <button type="submit" className="ons-button ons-auth-submit" disabled={busy}>
                     {headings[mode]}<ArrowRight size={17} aria-hidden="true" />
                   </button>
@@ -347,9 +379,16 @@ export function AccountPage() {
               {showUsername && <button type="button" className={methods.email ? 'ons-text-button' : 'ons-google-button ons-username-button'} disabled={busy} onClick={() => changeUsernameForm('signin')}>
                 <UserRound size={18} aria-hidden="true" />아이디로 로그인
               </button>}
+              {(showGoogle || showKakao) && !socialSignup && <button type="button" className="ons-text-button" disabled={busy} onClick={() => {
+                changeMode('signin')
+                setSocialSignup(true)
+              }}>간편 회원가입</button>}
               {!methods.email && !methods.google && !methods.kakao && !methods.username && <p className="ons-account-hint">현재 환경에서는 로그인 설정을 준비하고 있습니다.</p>}
             </div>
           ) : !error ? <p className="ons-account-hint" role="status">계정 정보를 불러오는 중입니다.</p> : null}
+          {showAccount && <nav className="ons-account-policies" aria-label="서비스 정책">
+            <a href="/terms">이용약관</a><a href="/privacy">개인정보 처리방침</a>
+          </nav>}
         </div>
       </section>
     </main>

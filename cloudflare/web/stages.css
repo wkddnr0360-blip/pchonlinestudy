@@ -4,28 +4,53 @@
 
 .ons-stage-gallery { scroll-margin-top: 1rem; }
 .ons-stage-gallery ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.72rem; margin: 0; padding: 0; list-style: none; }
-.ons-stage-card { width: 100%; height: 100%; box-sizing: border-box; position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; min-height: clamp(9.2rem, 19vw, 13.25rem); padding: clamp(0.9rem, 2vw, 1.25rem); border: 1px solid var(--stage-edge); border-radius: var(--ons-radius); background: var(--stage-tint); color: var(--ons-ink); text-align: start; text-decoration: none; cursor: pointer; transition: border-color 140ms, box-shadow 140ms; }
-.ons-stage-card:hover { border-color: var(--stage-ink); box-shadow: var(--ons-shadow); }
+.ons-stage-tile { position: relative; isolation: isolate; }
+.ons-stage-card { width: 100%; height: 100%; box-sizing: border-box; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; min-height: clamp(9.2rem, 17vw, 12.75rem); padding: clamp(0.9rem, 2vw, 1.25rem); border: 1px solid var(--stage-edge); border-radius: var(--ons-radius); background: var(--stage-tint); color: var(--ons-ink); text-align: start; text-decoration: none; cursor: pointer; transition: border-color 140ms, box-shadow 140ms; }
+.ons-stage-card:hover, .ons-stage-tile:has(.ons-mascot:hover) .ons-stage-card { border-color: var(--stage-ink); box-shadow: var(--ons-shadow); }
 .ons-stage-card-copy { display: grid; width: 100%; position: relative; z-index: 1; justify-items: start; gap: 0.28rem; }
 .ons-stage-no { display: inline-flex; padding: 0.22rem 0.57rem; border-radius: 0.48rem; color: var(--stage-ink); background: var(--stage-chip); font-weight: 860; font-size: 0.79rem; }
 .ons-stage-card-copy strong { display: block; font-size: clamp(1.18rem, 2.7vw, 1.78rem); line-height: 1.2; letter-spacing: -0.046em; font-weight: 900; }
 /* At its largest relative size, the scene starts just past the card's midpoint. */
 .ons-stage-card-description { max-inline-size: min(10.8rem, calc(54% - 0.5rem)); min-block-size: 2.7em; color: var(--ons-secondary); font-size: clamp(0.75rem, 1.7vw, 0.89rem); line-height: 1.35; }
 .ons-stage-status { font-size: 0.81rem; font-weight: 850; color: var(--stage-ink); }
-.ons-stage-card-icon { position: absolute; z-index: 2; inset: auto 0.7rem 0.65rem auto; display: grid; place-items: center; width: 2rem; aspect-ratio: 1; color: var(--stage-ink); background: #ffffffdc; border-radius: 50%; }
-.ons-stage-card .ons-stage-card-art { position: absolute; inset: 0 0 0 auto; width: 52%; max-width: 12rem; }
+.ons-stage-card-icon { position: absolute; z-index: 3; inset: auto 0.7rem 0.65rem auto; display: grid; place-items: center; width: 2rem; aspect-ratio: 1; color: var(--stage-ink); background: #ffffffdc; border-radius: 50%; }
+.ons-mascot { position: relative; display: grid; place-items: center; min-width: 2.75rem; min-height: 2.75rem; padding: 0; border: 0; border-radius: 0.85rem; background: transparent; color: inherit; cursor: pointer; }
+.ons-mascot:focus-visible { outline-offset: -4px; }
+.ons-mascot .ons-stage-art { width: 100%; }
+.ons-stage-tile .ons-stage-card-art { position: absolute; z-index: 2; inset: 0 0 0 auto; width: 49%; max-width: 12.5rem; }
+.ons-mascot .ons-stage-scene::after { content: none; }
 
 .ons-stage-art { position: relative; display: grid; place-items: center; min-width: 0; pointer-events: none; isolation: isolate; }
 .ons-stage-scene { position: absolute; inset: auto; width: min(75%, 8.6rem); aspect-ratio: 1; border-radius: 50%; background: var(--stage-orb); overflow: hidden; }
 .ons-stage-scene::after { content: ''; position: absolute; inset: 0; background: url('../../public/challenge/archive-scenes.webp') var(--stage-pose) center / 300% 100% no-repeat; opacity: 0.26; }
 .ons-stage-teacher { width: min(100%, 11.2rem); aspect-ratio: 1; position: relative; background: url('../../public/characters/teacher.webp') var(--stage-pose) center / 300% 100% no-repeat; image-rendering: pixelated; }
-.ons-stage-teacher[data-reaction="true"] { background-image: url('../../public/characters/teacher-reactions.webp'); animation: ons-stage-react 300ms steps(1, end) both; }
-@keyframes ons-stage-react { from { background-image: url('../../public/characters/teacher.webp'); } to { background-image: url('../../public/characters/teacher-reactions.webp'); } }
+.ons-stage-teacher[data-reaction="true"] { background-image: url('../../public/characters/teacher-reactions.webp'); }
+.ons-mascot .ons-stage-teacher::before { content: ''; position: absolute; inset: 0; opacity: 0; background: url('../../public/characters/teacher-reactions.webp') var(--stage-pose) center / 300% 100% no-repeat; }
+.ons-mascot-pixels { position: absolute; inset: 10% 12%; pointer-events: none; }
+.ons-mascot-pixels i {
+  position: absolute; inset: 36% auto auto 25%; width: 0.72rem; aspect-ratio: 1;
+  background: #ffdf70; animation: ons-mascot-spark 800ms steps(5, end) both;
+  clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%);
+}
+.ons-mascot-pixels i:nth-child(2) { inset: 27% 18% auto auto; background: #fff2ab; animation-delay: 110ms; }
+.ons-mascot-pixels i:nth-child(3) { inset: 48% 20% auto auto; width: 0.53rem; animation-delay: 170ms; }
+.ons-mascot[data-stage="2"] .ons-mascot-pixels i { background: #9a69e6; }
+.ons-mascot[data-stage="2"] .ons-mascot-pixels i:nth-child(2) { background: #eeaf36; }
+.ons-mascot[data-stage="3"] .ons-mascot-pixels i {
+  top: 62%; width: 0.85rem; aspect-ratio: 4 / 5; background: linear-gradient(#ffba5f, #ec642e);
+  clip-path: polygon(45% 0, 66% 36%, 78% 28%, 95% 65%, 95% 85%, 73% 100%, 25% 100%, 2% 80%, 16% 49%, 35% 58%);
+}
+@keyframes ons-mascot-spark {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-1.15rem) scale(0.65); }
+}
 
 .ons-stage-overlay { position: fixed; inset: 0; z-index: 20; background: #14234273; }
 .ons-stage-dialog { position: fixed; z-index: 21; inset: 50% auto auto 50%; transform: translate(-50%, -50%); width: min(28rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); box-sizing: border-box; overflow: auto; border-radius: var(--ons-radius); background: var(--ons-surface); box-shadow: 0 1.4rem 4rem #10192c31; }
 .ons-stage-dialog-close { position: absolute; z-index: 2; right: 0.7rem; top: 0.7rem; }
-.ons-stage-dialog-art { min-height: 10rem; background: var(--stage-tint); }
+.ons-stage-dialog-art { display: grid; place-items: center; min-height: 10rem; background: var(--stage-tint); }
+.ons-stage-dialog-art .ons-mascot { width: 11.2rem; }
 .ons-stage-dialog-copy, .ons-notes-dialog { padding: clamp(1.05rem, 4vw, 1.5rem); }
 .ons-stage-dialog h2 { margin: 0; font-size: 1.48rem; line-height: 1.18; font-weight: 850; letter-spacing: -0.035em; }
 .ons-stage-dialog p, .ons-notes-dialog li { color: var(--ons-secondary); }
@@ -37,11 +62,11 @@
 @media (max-width: 43.75rem) {
   .ons-stage-gallery ul { grid-template-columns: minmax(0, 1fr); gap: 0.55rem; }
   .ons-stage-card { min-height: 8.5rem; justify-content: center; }
-  .ons-stage-card .ons-stage-card-art { width: 51%; max-width: 11rem; }
+  .ons-stage-tile .ons-stage-card-art { max-width: 11rem; }
   .ons-stage-card-art .ons-stage-scene { width: min(78%, 7rem); }
   .ons-stage-card-art .ons-stage-teacher { width: min(82%, 8.2rem); }
 }
 @media (prefers-reduced-motion: reduce) {
   .ons-stage-card { transition: none; }
-  .ons-stage-teacher[data-reaction="true"] { animation: none; }
+  .ons-mascot-pixels { display: none; }
 }

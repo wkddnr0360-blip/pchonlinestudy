@@ -49,7 +49,7 @@ export default {
     const migration = await legacyCacheRoute(request, env, url)
     if (migration) return migration
 
-    const isShell = ['/', '/account', '/admin', '/study', '/exam'].includes(url.pathname)
+    const isShell = ['/', '/account', '/admin', '/study', '/exam', '/terms', '/privacy'].includes(url.pathname)
     if (!read || (!isShell && !fingerprintedAsset.test(url.pathname.slice(1)))) {
       return json({ error: 'not_found' }, 404, method)
     }
