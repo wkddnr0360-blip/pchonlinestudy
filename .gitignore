@@ -6,3 +6,9 @@ test-results/
 *.hwpx
 *.pdf
 __pycache__/
+public/book/
+.ons2/
+.wrangler/
+.dev.vars*
+cloudflare/wrangler.staging.jsonc
+cloudflare/wrangler.mcp.staging.jsonc

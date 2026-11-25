@@ -1,0 +1,27 @@
+name: Verify ONS 2.0
+
+on:
+  push:
+    branches: [feature/cloudflare-admin-mcp]
+  pull_request:
+    branches: [feature/cloudflare-admin-mcp]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: test -z "$(git ls-files -- public/book/)"
+      - run: npm test
+      - run: npm run build:ons2
+      - run: npm run test:ons2:runtime

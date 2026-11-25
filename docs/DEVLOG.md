@@ -1,5 +1,14 @@
 # 개발 기록
 
+## 2026-11-25 · P0-A Worker 빌드 분리 및 Git 교재 JSON 정리
+
+- 사용자 승인으로 원격 네 브랜치 이력에서 `public/book/`의 JSON 28개를 제거했다. 검증 복제본에서는 Git 객체 정합성, JSON 제거 및 35개 원래 커밋의 교재 이외 전체 트리를 확인했다. `main` 이력 갱신 커밋에 `[skip ci]`를 넣었고, 운영 홈과 `release.json`은 전후에 모두 HTTP 200이고 SHA-256이 같았다. 정리된 `main`의 교재 경로는 404다. GitHub PR #1의 이전 merge 참조와 이전 커밋의 직접 주소(HTTP 200)는 GitHub 측에 남아 있다. 운영 Pages는 소유자 선택으로 유지했다.
+- `cloudflare/`, `worker/`, `shared/static-assets.ts`, `tsconfig.worker.json`, `package.json`/잠금 파일, `.node-version`에 같은 React·TypeScript·Vite를 사용하는 독립 Workers 진입점과 로컬 D1·private R2·별도 MCP KV 바인딩을 추가했다. 배포 경로는 `.ons2/client`다. 기존 Pages 진입점은 회귀 검증에만 사용했다. 새 Workers 앱은 소개 화면과 헬스 체크만 열며 MCP 입구는 503을 반환한다.
+- `.gitignore`, `.github/workflows/ons2.yml`, `scripts/verify_worker_assets.mjs`, `tests/{fixtures.ts,synthetic-book.ts,ons2-setup.test.ts,ons2-runtime.mjs}`에 원문 재추적 방지, 합성 데이터, 정적 산출물 검사와 실제 workerd 통합 테스트를 추가했다. 신규 CI는 빌드와 검사만 수행한다. 설정 절차와 경계는 `docs/ONS2-STAGING.md`, `docs/adr/0001-worker-boundary.md`에 기록했다.
+- 정리 전 기준 검증에서 교재 3,129문항·27개 장 파일 구조 검증, 단위 테스트 21개, 기존 Vite 빌드, Chromium 데스크톱·모바일 및 WebKit 브라우저 테스트 28개를 통과했다. 임시 공개판 전용 9개는 전체판 실행에서 설계대로 건너뛰었다. 원본 HWPX를 재추출하는 비교는 이번에 수행하지 않았다.
+- 정리 후 `npm test` 22개, `npm run build:ons2` 및 정적 파일 검사 3개, `npm run test:ons2:runtime` 3개를 통과했다. 첫 런타임 실행은 샌드박스의 로컬 TCP 제약으로 실패하여 동일 명령을 루프백 허용 환경에서 다시 확인했다. `npm audit`는 기존 Pages 도구 체인의 `glob`, `minimatch`, `vite-plugin-pwa`, `workbox-build`에서 보통 등급 4개를 보고했다.
+- 검증 대기 항목은 비공개 개발 저장소, 권리 확인, 외부 스테이징 자원 및 스모크 테스트다. 운영 배포는 실행하지 않았다. 로컬 Worker 변경의 롤백은 이 단계 커밋만 되돌린다. 교재가 포함된 과거 Git 참조를 되살리지 않는다.
+
 ## 2026-11-25 · 최종 통합 Codex 지시 및 무료 일반모드 변경 (검증 대기)
 
 - 무료 회원 일반모드 허용: 1단계 100%, 최대 Silver. 인증 회원 1/2단계 일반모드, Gold 이후 2/3단계 50:50 도전모드. 경쟁 랭킹과 명예의 전당 인증 회원 전용, 무료 회원 분모 제외 기본 해석. 이전 무료 탑 차단 명세 대체.
